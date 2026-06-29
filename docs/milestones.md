@@ -37,7 +37,7 @@ spine, and Milestone 4 puts an HTTP face on it — both still fully deterministi
 
 ---
 
-## Project progress — ~80% complete
+## Project progress — ~88% complete
 
 > An **effort-weighted** estimate (not a feature count). Checked items are built and
 > tested; the remaining items are individually heavier — RAG, test generation, and the
@@ -55,11 +55,11 @@ spine, and Milestone 4 puts an HTTP face on it — both still fully deterministi
 | 8 | Coverage-gap detection (`CoverageAnalyzer` + `/coverage`) | ✅ done | 8% |
 | 9 | `TestGeneratorAgent` (manual cases) | ✅ done | 12% |
 | 10 | Self-review / critique step (`SelfReviewer`) | ✅ done | 6% |
-| 11 | Orchestrator pipeline + `POST /generate` (ADR-0004) | ⬜ next | 8% |
-| 12 | VS Code extension (thin TypeScript client — ADR-0005) | ⬜ | 10% |
+| 11 | Orchestrator pipeline + `POST /requirements/generate` (ADR-0004) | ✅ done | 8% |
+| 12 | VS Code extension (thin TypeScript client — ADR-0005) | ⬜ next | 10% |
 | 13 | Examples, golden cases, prompts, polish | ◐ started | 2% |
 
-**Done so far: items 1–10 ≈ 80%.**
+**Done so far: items 1–11 ≈ 88%.**
 
 Two caveats:
 - *Effort-weighted, not feature-count.* By count it's 3 of ~13 (~23%), but the remaining
@@ -610,13 +610,40 @@ Tests: 5 offline unit tests. Suite: **72 passed, 1 skipped**.
 
 ---
 
+## Milestone 9 — The Orchestrator (item #11)
+
+The capstone: one call runs the whole pipeline and returns review-ready test cases.
+
+- `app/services/orchestrator.py`: `GenerationOrchestrator` (an application service —
+  orchestration is logic, not routing). It is given its six collaborators (parser +
+  five agents) via constructor injection and chains them:
+  **parse → rules → risk → coverage → generate(gaps) → self-review**.
+- **Graceful degradation:** each LLM stage is wrapped; on its domain error the pipeline
+  records a note on `requirement.notes` and continues with a default — so one flaky
+  stage never 500s the whole request (the "permissive but observable" principle again).
+  Provider/connectivity errors are *not* swallowed.
+- `app/models/generation.py`: `GenerationResult { requirement, coverage, test_cases }`.
+  The requirement + coverage double as the *rationale* for the generated cases.
+- **Endpoint `POST /requirements/generate`** (`app/api/routes.py`): thin — builds the
+  orchestrator from injected collaborators and calls `run`. Because FastAPI caches
+  `get_llm_provider` within a request, all five agents share one provider instance.
+
+**Tests:** 2 orchestrator unit tests (real parser + stub agents: chaining + graceful
+degradation) and a full-pipeline endpoint test using a *sequenced* fake provider (one
+response per stage). Suite: **76 passed, 1 skipped**.
+
+---
+
 ## What's next
 
-- **Orchestrator (`POST /generate`, ADR-0004, #11):** chain everything —
-  parse → rules → risk → retrieve → coverage → generate → self-review — into one HTTP
-  call, surfacing the whole pipeline (and the test cases) for the first time.
-- **VS Code extension (#12)** and additional provider adapters (**Claude** via the
-  `claude-api` skill, **OpenAI**) behind the same port.
+- **VS Code extension (item #12):** the thin TypeScript client (ADR-0005) that POSTs a
+  requirement to `/requirements/generate` and renders the review-ready cases — the last
+  backend-side milestone before the product is end-to-end usable.
+- Additional provider adapters: a **Claude** adapter (`claude-api` skill) and **OpenAI**,
+  each just a new `complete()` behind the same port.
+
+Open question still parked: should `feature` get a `min_length=1` constraint on the
+model, or should that validation live in a separate layer? (See §3.4.)
 
 Open question still parked: should `feature` get a `min_length=1` constraint on the
 model, or should that validation live in a separate layer? (See §3.4.)

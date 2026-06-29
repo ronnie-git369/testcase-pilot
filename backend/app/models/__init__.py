@@ -6,7 +6,14 @@ through the system.
 """
 
 from app.models.coverage import CoverageReport
+from app.models.generation import GenerationResult
 from app.models.requirement import Requirement
 from app.models.test_case import TestCase, TestSuite
 
-__all__ = ["Requirement", "CoverageReport", "TestCase", "TestSuite"]
+__all__ = [
+    "Requirement",
+    "CoverageReport",
+    "TestCase",
+    "TestSuite",
+    "GenerationResult",
+]

@@ -150,7 +150,7 @@ Pinned in [`backend/requirements.txt`](backend/requirements.txt):
 ## Documentation
 
 - [**Milestone Walkthrough**](docs/milestones.md) — how the project was built so far and
-  *why*, with a progress tracker (currently ~62%)
+  *why*, with a progress tracker (currently ~88%)
 - [**API Reference & Guide**](docs/api.md) — endpoints, how a request flows, and how to run the API
 - [System Architecture](docs/architecture.md) · [Architecture Decision Records](docs/adr/README.md) · [Diagrams](docs/diagrams/README.md)
 

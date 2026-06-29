@@ -12,9 +12,10 @@
 The backend is a **FastAPI** application that exposes TestCasePilot's logic over HTTP.
 It serves a deterministic parse endpoint (Markdown → structured `Requirement`),
 LLM-backed analysis endpoints (business rules, risks, and retrieval-grounded coverage
-gaps), retrieval endpoints for semantic search over existing tests (RAG), and basic
-service/health routes. The deterministic and probabilistic parts are cleanly separated
-(see §3).
+gaps), a full **orchestrator** endpoint that runs the whole pipeline and returns
+generated test cases, retrieval endpoints for semantic search over existing tests (RAG),
+and basic service/health routes. The deterministic and probabilistic parts are cleanly
+separated (see §3).
 
 | Aspect | Detail |
 | --- | --- |
@@ -351,6 +352,31 @@ first). Makes two LLM calls (rule extraction + coverage) plus retrieval.
 }
 ```
 
+### `POST /requirements/generate`
+The **orchestrator** — runs the entire pipeline in one call:
+**parse → extract rules → analyze risks → retrieve → coverage → generate →
+self-review**. **Requires a reachable LLM provider** (and, for useful coverage, a
+populated retrieval index; see §2). Makes ~5 LLM calls.
+
+**Request body:** same as `/parse` — `{ "markdown": "..." }`.
+
+**Response:** a `GenerationResult` — the enriched requirement, the coverage report, and
+the final reviewed test cases:
+```json
+{
+  "requirement": { "feature": "Login", "business_rules": ["..."], "risks": ["..."], "...": "..." },
+  "coverage": { "covered": ["..."], "gaps": ["..."] },
+  "test_cases": [
+    { "title": "Account locks after 5 failed logins", "type": "security",
+      "priority": "high", "steps": ["..."], "expected_result": "...",
+      "covers": "account lockout is not tested" }
+  ]
+}
+```
+Individual LLM stages **degrade gracefully**: a stage that fails records a note in
+`requirement.notes` and the pipeline continues, so you get a best-effort result rather
+than an error.
+
 ### `POST /retrieval/index`
 Index (or upsert) existing test cases into the vector store for later search.
 Requires a working retrieval backend (Chroma; see §2).
@@ -424,6 +450,23 @@ The expected input Markdown shape and parsing rules are documented in the
 | `covered` | string[] | aspects already covered by existing tests |
 | `gaps` | string[] | aspects not yet covered — the testing gaps to fill |
 
+### `TestCase`
+| Field | Type | Notes |
+| --- | --- | --- |
+| `title` | string | short name of the case |
+| `type` | string | positive / negative / edge / security / … |
+| `priority` | string | high / medium / low |
+| `steps` | string[] | ordered steps to execute |
+| `expected_result` | string | the assertion / expected outcome |
+| `covers` | string | the rule / risk / gap this case addresses (traceability) |
+
+### `GenerationResult` (response of `/requirements/generate`)
+| Field | Type | Notes |
+| --- | --- | --- |
+| `requirement` | Requirement | the enriched requirement (rules + risks filled) |
+| `coverage` | CoverageReport | the gap analysis |
+| `test_cases` | TestCase[] | the final, self-reviewed cases |
+
 ---
 
 ## 7. Errors
@@ -463,10 +506,11 @@ backend/app/
 ├── main.py              # FastAPI app + router wiring (composition root)
 ├── api/
 │   ├── __init__.py      # exports the routers
-│   ├── routes.py        # /parse, /business-rules, /risks, /coverage + DI providers
+│   ├── routes.py        # /parse, /business-rules, /risks, /coverage, /generate + DI
 │   └── retrieval_routes.py  # /retrieval/index, /retrieval/search
 ├── services/
-│   └── requirement_parser.py   # RequirementParserService.parse()  (deterministic)
+│   ├── requirement_parser.py   # RequirementParserService.parse()  (deterministic)
+│   └── orchestrator.py         # GenerationOrchestrator — the full pipeline
 ├── agents/                      # LLM-backed agents
 │   ├── json_support.py              # shared complete_json() helper (Rule of Three)
 │   ├── business_rule_extractor.py   # BusinessRuleExtractor.extract()
@@ -486,7 +530,8 @@ backend/app/
 └── models/
     ├── requirement.py   # Requirement (response model / domain entity)
     ├── coverage.py      # CoverageReport (coverage endpoint response)
-    └── test_case.py     # TestCase / TestSuite (generated output)
+    ├── test_case.py     # TestCase / TestSuite (generated output)
+    └── generation.py    # GenerationResult (/generate response)
 backend/tests/           # parser, api, agent, provider, retrieval tests
 examples/existing_tests.json   # sample corpus to ingest via /retrieval/index
 ```
@@ -495,11 +540,11 @@ examples/existing_tests.json   # sample corpus to ingest via /retrieval/index
 
 ## 10. What's coming
 
-The same patterns (router, request/response models, dependency injection, the
-`LLMProvider` port) will host the rest of the agentic pipeline:
+The full backend pipeline is now in place (through `POST /requirements/generate`). What
+remains builds on the same patterns:
 
-- `POST /generate` — the orchestrator endpoint chaining all stages (parse → rules → risk
-  → retrieve → coverage gaps → generate → self-review), surfacing the `TestGeneratorAgent`
-  and `SelfReviewer` over HTTP. See [ADR-0004](./adr/0004-agent-orchestration-pipeline.md).
+- A **VS Code extension** (thin TypeScript client) that POSTs a requirement to
+  `/requirements/generate` and renders the review-ready cases. See
+  [ADR-0005](./adr/0005-vscode-extension-thin-client.md).
 - Additional provider adapters (Claude, OpenAI) — each a new `complete()` behind the
   same port. See [ADR-0002](./adr/0002-pluggable-llm-provider.md).

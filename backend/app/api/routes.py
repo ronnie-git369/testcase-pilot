@@ -10,11 +10,17 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel, Field
 
-from app.agents import BusinessRuleExtractor, CoverageAnalyzer, RiskAnalyzer
-from app.models import CoverageReport, Requirement
+from app.agents import (
+    BusinessRuleExtractor,
+    CoverageAnalyzer,
+    RiskAnalyzer,
+    SelfReviewer,
+    TestGeneratorAgent,
+)
+from app.models import CoverageReport, GenerationResult, Requirement
 from app.providers import LLMProvider, get_llm_provider
 from app.retrieval import TestCaseRetriever, get_retriever
-from app.services import RequirementParserService
+from app.services import GenerationOrchestrator, RequirementParserService
 
 # Grouped under /requirements; `tags` controls the section name in /docs.
 router = APIRouter(prefix="/requirements", tags=["requirements"])
@@ -124,3 +130,46 @@ def analyze_coverage(
     requirement = parser.parse(request.markdown)
     requirement.business_rules = extractor.extract(requirement)
     return analyzer.analyze(requirement)
+
+
+def get_test_generator(
+    provider: LLMProvider = Depends(get_llm_provider),
+) -> TestGeneratorAgent:
+    """Provide the test generator with an injected LLM provider."""
+    return TestGeneratorAgent(provider)
+
+
+def get_self_reviewer(
+    provider: LLMProvider = Depends(get_llm_provider),
+) -> SelfReviewer:
+    """Provide the self-reviewer with an injected LLM provider."""
+    return SelfReviewer(provider)
+
+
+def get_orchestrator(
+    parser: RequirementParserService = Depends(get_parser),
+    rule_extractor: BusinessRuleExtractor = Depends(get_business_rule_extractor),
+    risk_analyzer: RiskAnalyzer = Depends(get_risk_analyzer),
+    coverage_analyzer: CoverageAnalyzer = Depends(get_coverage_analyzer),
+    generator: TestGeneratorAgent = Depends(get_test_generator),
+    reviewer: SelfReviewer = Depends(get_self_reviewer),
+) -> GenerationOrchestrator:
+    """Assemble the full pipeline orchestrator from its injected collaborators."""
+    return GenerationOrchestrator(
+        parser, rule_extractor, risk_analyzer, coverage_analyzer, generator, reviewer
+    )
+
+
+@router.post("/generate", response_model=GenerationResult)
+def generate(
+    request: ParseRequirementRequest,
+    orchestrator: GenerationOrchestrator = Depends(get_orchestrator),
+) -> GenerationResult:
+    """Run the full pipeline: parse -> rules -> risk -> coverage -> generate -> review.
+
+    Returns the enriched requirement, the coverage report, and the final reviewed
+    test cases. Individual LLM stages degrade gracefully (failures are recorded in
+    `requirement.notes`), so the call returns a best-effort result rather than failing
+    outright.
+    """
+    return orchestrator.run(request.markdown)
