@@ -3,11 +3,15 @@
 import * as vscode from "vscode";
 
 import { generateTestCases } from "./api";
+import { RequirementPanel } from "./panel";
 import { renderReport } from "./render";
 
 export function activate(context: vscode.ExtensionContext): void {
   context.subscriptions.push(
-    vscode.commands.registerCommand("testcasePilot.generate", runGenerate)
+    vscode.commands.registerCommand("testcasePilot.generate", runGenerate),
+    vscode.commands.registerCommand("testcasePilot.newRequirement", () =>
+      RequirementPanel.show()
+    )
   );
 }
 

@@ -138,6 +138,30 @@ ANTHROPIC_API_KEY=...
 OLLAMA_HOST=http://localhost:11434
 ```
 
+### VS Code extension
+
+The extension is a thin TypeScript client over the backend. With the API running,
+build it and launch it in an Extension Development Host:
+
+```bash
+cd extension
+npm install        # first time only
+npm run compile    # or `npm run watch` to rebuild on change
+```
+
+Open the `extension/` folder in VS Code and press **F5** to launch the dev host.
+Inside that window there are two ways to generate test cases:
+
+- **Form UI** — run **TestCasePilot: New Requirement (Form)** from the Command
+  Palette, or click the 🧪 button in the editor toolbar (shown on Markdown files).
+  Fill in the feature, user story, and acceptance criteria, then **Generate test
+  cases**. The full report opens beside the form.
+- **From a file** — open a Markdown requirement and run **TestCasePilot: Generate
+  Test Cases** to send the whole document (or the current selection).
+
+The backend URL defaults to `http://127.0.0.1:8000`; override it with the
+`testcasePilot.apiUrl` setting.
+
 ## Backend Dependencies
 
 Pinned in [`backend/requirements.txt`](backend/requirements.txt):

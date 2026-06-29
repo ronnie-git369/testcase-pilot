@@ -16,10 +16,24 @@
   "contributes": {
     "commands": [
       {
+        "command": "testcasePilot.newRequirement",
+        "title": "TestCasePilot: New Requirement (Form)",
+        "icon": "$(beaker)"
+      },
+      {
         "command": "testcasePilot.generate",
         "title": "TestCasePilot: Generate Test Cases"
       }
     ],
+    "menus": {
+      "editor/title": [
+        {
+          "command": "testcasePilot.newRequirement",
+          "group": "navigation",
+          "when": "resourceLangId == markdown"
+        }
+      ]
+    },
     "configuration": {
       "title": "TestCasePilot",
       "properties": {
