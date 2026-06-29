@@ -37,6 +37,39 @@ spine, and Milestone 4 puts an HTTP face on it — both still fully deterministi
 
 ---
 
+## Project progress — ~22% complete
+
+> An **effort-weighted** estimate (not a feature count). Checked items are built and
+> tested; the remaining items are individually heavier — RAG, test generation, and the
+> VS Code extension are the big ones.
+
+| # | Component | Status | ~Weight |
+| --- | --- | --- | --- |
+| 1 | Foundation + architecture docs (M1–M2) | ✅ done | 10% |
+| 2 | `Requirement` model + parser, tested (M3) | ✅ done | 8% |
+| 3 | `POST /requirements/parse` endpoint (M4 · Step 1) | ✅ done | 4% |
+| 4 | Pluggable LLM provider (OpenAI / Claude / Ollama — ADR-0002) | ⬜ next | 8% |
+| 5 | `BusinessRuleExtractor` agent | ⬜ | 6% |
+| 6 | `RiskAnalyzer` agent | ⬜ | 6% |
+| 7 | RAG over existing tests (ChromaDB — ADR-0003) | ⬜ | 12% |
+| 8 | Coverage-gap detection | ⬜ | 8% |
+| 9 | `TestGeneratorAgent` (manual + Playwright cases) | ⬜ | 12% |
+| 10 | Self-review / critique step | ⬜ | 6% |
+| 11 | Orchestrator pipeline + `POST /generate` (ADR-0004) | ⬜ | 8% |
+| 12 | VS Code extension (thin TypeScript client — ADR-0005) | ⬜ | 10% |
+| 13 | Examples, golden cases, prompts, polish | ◐ started | 2% |
+
+**Done so far: items 1–3 ≈ 22%.**
+
+Two caveats:
+- *Effort-weighted, not feature-count.* By count it's 3 of ~13 (~23%), but the remaining
+  items are individually harder, so wall-clock progress may feel lower than 22%.
+- *The deterministic foundation is disproportionately valuable.* The model, the tested
+  service pattern, the API/DI conventions, and the test harness are reused by every
+  future agent — you've built the part everything else stands on.
+
+---
+
 ## Milestone 1 — Project Foundation
 
 **Goal:** a runnable, version-controlled FastAPI service skeleton.
