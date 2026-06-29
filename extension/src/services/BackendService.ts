@@ -14,12 +14,15 @@ import { InvalidResponseError } from "../api/errors";
 import {
   isCoverageReport,
   isGenerationResult,
+  isPlaywrightSpec,
   isRequirement,
 } from "../models/guards";
 import type {
   CoverageReport,
   GenerationResult,
+  PlaywrightSpec,
   Requirement,
+  TestCase,
 } from "../models/requirement";
 
 export class BackendService {
@@ -56,6 +59,21 @@ export class BackendService {
 
   generate(markdown: string): Promise<GenerationResult> {
     return this.postGuarded(ENDPOINTS.generate, markdown, isGenerationResult);
+  }
+
+  /** Render a Playwright spec from already-generated test cases (no LLM). */
+  async playwright(
+    feature: string,
+    testCases: TestCase[]
+  ): Promise<PlaywrightSpec> {
+    const data = await this.client.postJson<unknown>(ENDPOINTS.playwright, {
+      feature,
+      test_cases: testCases,
+    });
+    if (!isPlaywrightSpec(data)) {
+      throw new InvalidResponseError(`unexpected shape from ${ENDPOINTS.playwright}`);
+    }
+    return data;
   }
 
   private async postGuarded<T>(

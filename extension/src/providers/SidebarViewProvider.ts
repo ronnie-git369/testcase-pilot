@@ -19,6 +19,7 @@ import type {
   WebviewToHost,
 } from "../models/messages";
 import type { GenerationResult } from "../models/requirement";
+import type { BackendService } from "../services/BackendService";
 import { toJsonExport, toMarkdownExport } from "../services/exporter";
 import type { PipelineService } from "../services/PipelineService";
 import { renderReport } from "../services/render";
@@ -50,7 +51,8 @@ export class SidebarViewProvider implements vscode.WebviewViewProvider {
     private readonly logger: Logger,
     private readonly pipeline: PipelineService,
     private readonly statusBar: StatusBar,
-    private readonly workspace: WorkspaceService
+    private readonly workspace: WorkspaceService,
+    private readonly backend: BackendService
   ) {}
 
   resolveWebviewView(webviewView: vscode.WebviewView): void {
@@ -92,6 +94,9 @@ export class SidebarViewProvider implements vscode.WebviewViewProvider {
         break;
       case "generate":
         void this.openReport();
+        break;
+      case "generatePlaywright":
+        void this.generatePlaywright();
         break;
       case "useActiveEditor":
         this.useActiveEditor();
@@ -198,6 +203,39 @@ export class SidebarViewProvider implements vscode.WebviewViewProvider {
       return;
     }
     this.post({ type: "setMarkdown", markdown: text });
+  }
+
+  /** Render a Playwright spec (backend codegen) and save it to tests/e2e/. */
+  private async generatePlaywright(): Promise<void> {
+    if (!this.lastResult) {
+      this.post({ type: "log", text: "Run Analyze first." });
+      return;
+    }
+    this.post({ type: "log", text: "Generating Playwright spec…" });
+    try {
+      const spec = await this.backend.playwright(
+        this.lastResult.requirement.feature,
+        this.lastResult.testCases
+      );
+      const uri = await this.workspace.saveArtifact(
+        spec.filename,
+        spec.code,
+        "tests/e2e"
+      );
+      if (uri) {
+        this.logger.info(`Playwright spec -> ${uri.fsPath}`);
+        this.post({ type: "log", text: `Saved ${spec.filename}` });
+        void vscode.window.showInformationMessage(
+          `TestCasePilot: saved ${vscode.workspace.asRelativePath(uri)}.`
+        );
+      } else {
+        this.post({ type: "log", text: "Export cancelled." });
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      this.logger.error(`Playwright generation failed: ${message}`);
+      this.post({ type: "error", message });
+    }
   }
 
   /** Export the last analysis to a Markdown or JSON file (with confirmation). */

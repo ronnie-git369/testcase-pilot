@@ -108,6 +108,9 @@
   byId("gen-tests").addEventListener("click", () =>
     vscode.postMessage({ type: "generate", markdown: requirementEl.value })
   );
+  byId("gen-playwright").addEventListener("click", () =>
+    vscode.postMessage({ type: "generatePlaywright" })
+  );
   byId("export-md").addEventListener("click", () =>
     vscode.postMessage({ type: "export", format: "markdown" })
   );

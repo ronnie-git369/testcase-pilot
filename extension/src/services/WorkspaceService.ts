@@ -30,10 +30,11 @@ export class WorkspaceService {
    */
   async saveArtifact(
     fileName: string,
-    content: string
+    content: string,
+    defaultSubdir = "testcases"
   ): Promise<vscode.Uri | undefined> {
     const target = await vscode.window.showSaveDialog({
-      defaultUri: this.defaultUriFor(fileName),
+      defaultUri: this.defaultUriFor(fileName, defaultSubdir),
       saveLabel: "Save",
       filters: this.filtersFor(fileName),
     });
@@ -50,11 +51,16 @@ export class WorkspaceService {
     return target;
   }
 
-  private defaultUriFor(fileName: string): vscode.Uri | undefined {
+  private defaultUriFor(
+    fileName: string,
+    subdir: string
+  ): vscode.Uri | undefined {
     const folder = vscode.workspace.workspaceFolders?.[0];
-    return folder
-      ? vscode.Uri.joinPath(folder.uri, "testcases", fileName)
-      : undefined;
+    if (!folder) {
+      return undefined;
+    }
+    // Split the subdir so nested paths (e.g. "tests/e2e") become real segments.
+    return vscode.Uri.joinPath(folder.uri, ...subdir.split("/"), fileName);
   }
 
   private filtersFor(fileName: string): { [label: string]: string[] } | undefined {

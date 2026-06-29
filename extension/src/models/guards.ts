@@ -9,6 +9,7 @@
 import type {
   CoverageReport,
   GenerationResult,
+  PlaywrightSpec,
   Requirement,
   TestCase,
 } from "./requirement";
@@ -47,6 +48,10 @@ function isTestCase(v: unknown): v is TestCase {
     typeof v.expected_result === "string" &&
     typeof v.covers === "string"
   );
+}
+
+export function isPlaywrightSpec(v: unknown): v is PlaywrightSpec {
+  return isObject(v) && typeof v.filename === "string" && typeof v.code === "string";
 }
 
 export function isGenerationResult(v: unknown): v is GenerationResult {

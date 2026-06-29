@@ -11,6 +11,7 @@ export const ENDPOINTS = {
   coverage: "/requirements/coverage",
   generate: "/requirements/generate",
   retrievalSearch: "/retrieval/search",
+  playwright: "/tests/playwright",
   health: "/health",
 } as const;
 

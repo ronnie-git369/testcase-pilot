@@ -26,6 +26,7 @@ export type WebviewToHost =
   | { type: "ready" }
   | { type: "analyze"; markdown: string }
   | { type: "generate"; markdown: string }
+  | { type: "generatePlaywright" }
   | { type: "export"; format: ExportFormat }
   | { type: "useActiveEditor" };
 

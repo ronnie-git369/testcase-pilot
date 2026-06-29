@@ -2,7 +2,7 @@
 
 from fastapi import FastAPI
 
-from app.api import retrieval_router
+from app.api import playwright_router, retrieval_router
 from app.api import router as api_router
 
 app = FastAPI(
@@ -16,11 +16,13 @@ app = FastAPI(
 # composition root: it wires routers together but contains no route logic.
 app.include_router(api_router)
 app.include_router(retrieval_router)
+app.include_router(playwright_router)
 
 
 @app.get("/")
 def read_root():
     """Service banner."""
+    
     return {"service": "TestCasePilot API", "status": "ok", "version": "0.1.0"}
 
 

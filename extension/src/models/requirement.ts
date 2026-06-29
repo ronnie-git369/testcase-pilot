@@ -33,3 +33,8 @@ export interface GenerationResult {
   coverage: CoverageReport;
   test_cases: TestCase[];
 }
+
+export interface PlaywrightSpec {
+  filename: string;
+  code: string;
+}

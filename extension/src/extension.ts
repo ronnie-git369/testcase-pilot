@@ -39,7 +39,8 @@ export function activate(context: vscode.ExtensionContext): void {
     logger,
     pipeline,
     statusBar,
-    workspace
+    workspace,
+    backend
   );
 
   logger.info("TestCasePilot activated.");

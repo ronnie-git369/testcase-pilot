@@ -60,7 +60,7 @@ export function renderSidebarHtml(
     <h2>Generate</h2>
     <div class="row wrap">
       <button id="gen-tests" class="ghost">Generate Test Cases</button>
-      <button id="gen-playwright" class="ghost" disabled title="Coming soon (M11)">Generate Playwright Tests</button>
+      <button id="gen-playwright" class="ghost" title="Render a Playwright spec from the last analysis">Generate Playwright Tests</button>
       <button id="export-md" class="ghost">Export Markdown</button>
       <button id="export-json" class="ghost">Export JSON</button>
     </div>
