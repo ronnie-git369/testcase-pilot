@@ -23,7 +23,10 @@ import type {
 } from "../models/requirement";
 
 export class BackendService {
-  constructor(private readonly client: ApiClient) {}
+  constructor(
+    private readonly client: ApiClient,
+    private readonly getProvider: () => string = () => "auto"
+  ) {}
 
   /** Liveness probe. Returns false (not throws) on any failure — it's a yes/no. */
   async health(): Promise<boolean> {
@@ -60,7 +63,15 @@ export class BackendService {
     markdown: string,
     guard: (value: unknown) => value is T
   ): Promise<T> {
-    const data = await this.client.postJson<unknown>(path, { markdown });
+    // Forward the provider hint when the user set one. The backend currently
+    // selects its provider via env (LLM_PROVIDER) and ignores unknown body
+    // fields, so this is a forward-compatible seam — honoring the per-request
+    // provider is a future additive backend change.
+    const provider = this.getProvider();
+    const body =
+      provider && provider !== "auto" ? { markdown, provider } : { markdown };
+
+    const data = await this.client.postJson<unknown>(path, body);
     if (!guard(data)) {
       throw new InvalidResponseError(`unexpected shape from ${path}`);
     }
