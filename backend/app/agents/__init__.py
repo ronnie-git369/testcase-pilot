@@ -9,6 +9,7 @@ from app.agents.business_rule_extractor import (
     BusinessRuleExtractionError,
     BusinessRuleExtractor,
 )
+from app.agents.coverage_analyzer import CoverageAnalysisError, CoverageAnalyzer
 from app.agents.risk_analyzer import RiskAnalysisError, RiskAnalyzer
 
 __all__ = [
@@ -16,4 +17,6 @@ __all__ = [
     "BusinessRuleExtractionError",
     "RiskAnalyzer",
     "RiskAnalysisError",
+    "CoverageAnalyzer",
+    "CoverageAnalysisError",
 ]

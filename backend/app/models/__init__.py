@@ -5,6 +5,7 @@ no I/O, and no LLM calls — they only define the *shape* of data that flows
 through the system.
 """
 
+from app.models.coverage import CoverageReport
 from app.models.requirement import Requirement
 
-__all__ = ["Requirement"]
+__all__ = ["Requirement", "CoverageReport"]

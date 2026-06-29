@@ -10,9 +10,10 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel, Field
 
-from app.agents import BusinessRuleExtractor, RiskAnalyzer
-from app.models import Requirement
+from app.agents import BusinessRuleExtractor, CoverageAnalyzer, RiskAnalyzer
+from app.models import CoverageReport, Requirement
 from app.providers import LLMProvider, get_llm_provider
+from app.retrieval import TestCaseRetriever, get_retriever
 from app.services import RequirementParserService
 
 # Grouped under /requirements; `tags` controls the section name in /docs.
@@ -96,3 +97,30 @@ def analyze_risks(
     requirement = parser.parse(request.markdown)
     requirement.risks = analyzer.analyze(requirement)
     return requirement
+
+
+def get_coverage_analyzer(
+    provider: LLMProvider = Depends(get_llm_provider),
+    retriever: TestCaseRetriever = Depends(get_retriever),
+) -> CoverageAnalyzer:
+    """Provide the coverage analyzer with an injected provider + retriever."""
+    return CoverageAnalyzer(provider, retriever)
+
+
+@router.post("/coverage", response_model=CoverageReport)
+def analyze_coverage(
+    request: ParseRequirementRequest,
+    parser: RequirementParserService = Depends(get_parser),
+    extractor: BusinessRuleExtractor = Depends(get_business_rule_extractor),
+    analyzer: CoverageAnalyzer = Depends(get_coverage_analyzer),
+) -> CoverageReport:
+    """Parse Markdown, extract business rules, then report coverage gaps.
+
+    A three-stage pipeline: deterministic parse -> probabilistic rule extraction
+    -> retrieval-grounded coverage analysis. The closest thing yet to the full
+    orchestrator. (FastAPI caches get_llm_provider within the request, so the
+    extractor and analyzer share one provider instance.)
+    """
+    requirement = parser.parse(request.markdown)
+    requirement.business_rules = extractor.extract(requirement)
+    return analyzer.analyze(requirement)

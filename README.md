@@ -149,8 +149,9 @@ Pinned in [`backend/requirements.txt`](backend/requirements.txt):
 
 ## Documentation
 
-- [**Milestone Walkthrough (M1–M3)**](docs/milestones.md) — how the project was built so
-  far and *why*, with the Requirement Analysis Engine documented in depth
+- [**Milestone Walkthrough**](docs/milestones.md) — how the project was built so far and
+  *why*, with a progress tracker (currently ~62%)
+- [**API Reference & Guide**](docs/api.md) — endpoints, how a request flows, and how to run the API
 - [System Architecture](docs/architecture.md) · [Architecture Decision Records](docs/adr/README.md) · [Diagrams](docs/diagrams/README.md)
 
 ## Roadmap

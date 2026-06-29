@@ -37,7 +37,7 @@ spine, and Milestone 4 puts an HTTP face on it — both still fully deterministi
 
 ---
 
-## Project progress — ~54% complete
+## Project progress — ~62% complete
 
 > An **effort-weighted** estimate (not a feature count). Checked items are built and
 > tested; the remaining items are individually heavier — RAG, test generation, and the
@@ -52,14 +52,14 @@ spine, and Milestone 4 puts an HTTP face on it — both still fully deterministi
 | 5 | `BusinessRuleExtractor` agent + `/business-rules` endpoint | ✅ done | 6% |
 | 6 | `RiskAnalyzer` agent + `/risks` endpoint | ✅ done | 6% |
 | 7 | RAG retrieval over existing tests (ChromaDB — ADR-0003) | ✅ done | 12% |
-| 8 | Coverage-gap detection | ⬜ next | 8% |
-| 9 | `TestGeneratorAgent` (manual + Playwright cases) | ⬜ | 12% |
+| 8 | Coverage-gap detection (`CoverageAnalyzer` + `/coverage`) | ✅ done | 8% |
+| 9 | `TestGeneratorAgent` (manual + Playwright cases) | ⬜ next | 12% |
 | 10 | Self-review / critique step | ⬜ | 6% |
 | 11 | Orchestrator pipeline + `POST /generate` (ADR-0004) | ⬜ | 8% |
 | 12 | VS Code extension (thin TypeScript client — ADR-0005) | ⬜ | 10% |
 | 13 | Examples, golden cases, prompts, polish | ◐ started | 2% |
 
-**Done so far: items 1–7 ≈ 54%.**
+**Done so far: items 1–8 ≈ 62%.**
 
 Two caveats:
 - *Effort-weighted, not feature-count.* By count it's 3 of ~13 (~23%), but the remaining
@@ -527,13 +527,58 @@ skip-guarded `ChromaRetriever` integration test. Suite: **54 passed, 1 skipped**
 
 ---
 
+## Milestone 6 — Coverage-Gap Detection (item #8)
+
+The core of TestCasePilot's "depth over volume" value, and two architecture firsts.
+
+### The Rule-of-Three refactor (finally triggered)
+
+With a *third* JSON-emitting agent on the way, the duplicated
+prompt → extract-JSON → validate → retry loop earned a shared home:
+
+- `app/agents/json_support.py` — `complete_json(provider, prompt, schema, *, error_type)`.
+  Each agent now supplies only what *varies* (its prompt, Pydantic schema, and domain
+  error); the constant parse/retry loop lives once.
+- `BusinessRuleExtractor` and `RiskAnalyzer` were rebuilt on it with **zero test
+  changes** — the 54 existing tests were the safety net. `error_type` as a parameter is
+  what let each agent keep its own exception.
+
+### `CoverageAnalyzer` — the first dual-port agent
+
+Depends on **both** `LLMProvider` and `TestCaseRetriever`:
+
+```
+   Requirement ──► CoverageAnalyzer ──► CoverageReport { covered, gaps }
+                      │            │
+                      ▼            ▼
+            TestCaseRetriever    LLMProvider
+            (retrieve existing)  (reason about gaps)
+```
+
+`analyze(req)` searches **per acceptance criterion and business rule**, dedupes hits by
+id, then makes one `complete_json` call over the requirement + retrieved tests. Pure
+(returns a `CoverageReport`, mutates nothing). Both deps injected → tests run offline
+with a `FakeProvider` + a stub retriever.
+
+### Endpoint — the closest thing yet to the orchestrator
+
+`POST /requirements/coverage` chains **parse → extract business rules → analyze
+coverage** and returns a `CoverageReport`. FastAPI caches `get_llm_provider` within a
+request, so the extractor and analyzer share one provider instance (the endpoint test
+exploits this with a *sequenced* fake: first completion = rules, second = coverage).
+
+Tests: 6 `CoverageAnalyzer` unit tests + 2 endpoint tests. Suite: **62 passed, 1
+skipped**.
+
+---
+
 ## What's next
 
-- **Coverage-gap detection (item #8):** compare a requirement's intent (rules, criteria)
-  against the *retrieved* existing tests to find what is **not** yet covered — the core
-  of TestCasePilot's "depth over volume" value.
-- Then: the `TestGeneratorAgent` (#9), a self-review step (#10), the orchestrator
-  (`POST /generate`, ADR-0004, #11), and the VS Code extension (#12).
+- **`TestGeneratorAgent` (item #9):** generate manual + Playwright test cases from the
+  requirement's rules, risks, and the coverage **gaps** — finally producing the output
+  the whole pipeline exists to create.
+- Then: a self-review step (#10), the orchestrator (`POST /generate`, ADR-0004, #11),
+  and the VS Code extension (#12).
 - Additional provider adapters — a **Claude** adapter (`claude-api` skill) and **OpenAI**
   — each just a new `complete()` behind the same port.
 

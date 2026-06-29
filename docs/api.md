@@ -10,10 +10,11 @@
 ## 1. Overview
 
 The backend is a **FastAPI** application that exposes TestCasePilot's logic over HTTP.
-It serves a deterministic parse endpoint (Markdown → structured `Requirement`), two
-LLM-backed analysis endpoints (business rules, risks), retrieval endpoints for semantic
-search over existing tests (RAG), and basic service/health routes. The deterministic and
-probabilistic parts are cleanly separated (see §3).
+It serves a deterministic parse endpoint (Markdown → structured `Requirement`),
+LLM-backed analysis endpoints (business rules, risks, and retrieval-grounded coverage
+gaps), retrieval endpoints for semantic search over existing tests (RAG), and basic
+service/health routes. The deterministic and probabilistic parts are cleanly separated
+(see §3).
 
 | Aspect | Detail |
 | --- | --- |
@@ -334,6 +335,22 @@ curl -X POST http://127.0.0.1:8000/requirements/risks \
 }
 ```
 
+### `POST /requirements/coverage`
+Run the three-stage pipeline — **parse → extract business rules → analyze coverage** —
+comparing the requirement against *retrieved* existing tests. **Requires a reachable LLM
+provider and a populated retrieval index** (see §2; index tests via `/retrieval/index`
+first). Makes two LLM calls (rule extraction + coverage) plus retrieval.
+
+**Request body:** same as `/parse` — `{ "markdown": "..." }`.
+
+**Response:** a `CoverageReport` (not a `Requirement`):
+```json
+{
+  "covered": ["valid login is tested"],
+  "gaps": ["account lockout after repeated failures is not tested"]
+}
+```
+
 ### `POST /retrieval/index`
 Index (or upsert) existing test cases into the vector store for later search.
 Requires a working retrieval backend (Chroma; see §2).
@@ -401,6 +418,12 @@ Results are ordered best-first; `score` is normalized to 0..1 (higher = more sim
 The expected input Markdown shape and parsing rules are documented in the
 [Milestone Walkthrough §3.2–3.3](./milestones.md).
 
+### `CoverageReport` (response of `/requirements/coverage`)
+| Field | Type | Notes |
+| --- | --- | --- |
+| `covered` | string[] | aspects already covered by existing tests |
+| `gaps` | string[] | aspects not yet covered — the testing gaps to fill |
+
 ---
 
 ## 7. Errors
@@ -440,13 +463,15 @@ backend/app/
 ├── main.py              # FastAPI app + router wiring (composition root)
 ├── api/
 │   ├── __init__.py      # exports the routers
-│   ├── routes.py        # /parse, /business-rules, /risks + their DI providers
+│   ├── routes.py        # /parse, /business-rules, /risks, /coverage + DI providers
 │   └── retrieval_routes.py  # /retrieval/index, /retrieval/search
 ├── services/
 │   └── requirement_parser.py   # RequirementParserService.parse()  (deterministic)
 ├── agents/                      # LLM-backed agents
+│   ├── json_support.py              # shared complete_json() helper (Rule of Three)
 │   ├── business_rule_extractor.py   # BusinessRuleExtractor.extract()
-│   └── risk_analyzer.py             # RiskAnalyzer.analyze()
+│   ├── risk_analyzer.py             # RiskAnalyzer.analyze()
+│   └── coverage_analyzer.py         # CoverageAnalyzer.analyze() (LLM + retriever)
 ├── providers/                   # LLM provider port + adapters (ADR-0002)
 │   ├── base.py          # LLMProvider Protocol (the port)
 │   ├── ollama_provider.py   # OllamaProvider adapter (httpx -> Ollama)
@@ -457,7 +482,8 @@ backend/app/
 │   ├── fake.py          # FakeRetriever (in-memory, tests)
 │   └── factory.py       # get_retriever() — selects backend from env
 └── models/
-    └── requirement.py   # Requirement (response model / domain entity)
+    ├── requirement.py   # Requirement (response model / domain entity)
+    └── coverage.py      # CoverageReport (coverage endpoint response)
 backend/tests/           # parser, api, agent, provider, retrieval tests
 examples/existing_tests.json   # sample corpus to ingest via /retrieval/index
 ```
@@ -469,10 +495,10 @@ examples/existing_tests.json   # sample corpus to ingest via /retrieval/index
 The same patterns (router, request/response models, dependency injection, the
 `LLMProvider` port) will host the rest of the agentic pipeline:
 
-- **Coverage-gap detection** — compare a requirement against the *retrieved* existing
-  tests (`/retrieval/search`) to find what's not yet covered.
-- The `TestGeneratorAgent`, then `POST /generate` — the orchestrator endpoint chaining
-  all stages (analyze → extract rules → risk → retrieve → coverage gaps → generate →
-  self-review). See [ADR-0004](./adr/0004-agent-orchestration-pipeline.md).
+- The `TestGeneratorAgent` (generate cases from rules + risks + coverage gaps), then a
+  self-review pass.
+- `POST /generate` — the orchestrator endpoint chaining all stages (parse → rules → risk
+  → retrieve → coverage gaps → generate → self-review). See
+  [ADR-0004](./adr/0004-agent-orchestration-pipeline.md).
 - Additional provider adapters (Claude, OpenAI) — each a new `complete()` behind the
   same port. See [ADR-0002](./adr/0002-pluggable-llm-provider.md).
