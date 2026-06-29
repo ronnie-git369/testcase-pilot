@@ -12,8 +12,6 @@ pluggy==1.6.0
 pytest==8.4.2
 tomli==2.4.1
 
-# Needed by fastapi.testclient (TestClient) for the API tests.
-certifi==2026.6.17
-httpcore==1.0.9
-httpx==0.28.1
-sniffio==1.3.1
+# Note: httpx (used by fastapi.testclient) is now a RUNTIME dependency
+# (the OllamaProvider calls Ollama over HTTP), so it lives in requirements.txt
+# and is pulled in here via the -r line above.

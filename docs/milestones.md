@@ -37,7 +37,7 @@ spine, and Milestone 4 puts an HTTP face on it — both still fully deterministi
 
 ---
 
-## Project progress — ~22% complete
+## Project progress — ~36% complete
 
 > An **effort-weighted** estimate (not a feature count). Checked items are built and
 > tested; the remaining items are individually heavier — RAG, test generation, and the
@@ -48,9 +48,9 @@ spine, and Milestone 4 puts an HTTP face on it — both still fully deterministi
 | 1 | Foundation + architecture docs (M1–M2) | ✅ done | 10% |
 | 2 | `Requirement` model + parser, tested (M3) | ✅ done | 8% |
 | 3 | `POST /requirements/parse` endpoint (M4 · Step 1) | ✅ done | 4% |
-| 4 | Pluggable LLM provider (OpenAI / Claude / Ollama — ADR-0002) | ⬜ next | 8% |
-| 5 | `BusinessRuleExtractor` agent | ⬜ | 6% |
-| 6 | `RiskAnalyzer` agent | ⬜ | 6% |
+| 4 | Pluggable LLM provider port + Ollama adapter (ADR-0002) | ✅ done | 8% |
+| 5 | `BusinessRuleExtractor` agent + `/business-rules` endpoint | ✅ done | 6% |
+| 6 | `RiskAnalyzer` agent | ⬜ next | 6% |
 | 7 | RAG over existing tests (ChromaDB — ADR-0003) | ⬜ | 12% |
 | 8 | Coverage-gap detection | ⬜ | 8% |
 | 9 | `TestGeneratorAgent` (manual + Playwright cases) | ⬜ | 12% |
@@ -59,7 +59,7 @@ spine, and Milestone 4 puts an HTTP face on it — both still fully deterministi
 | 12 | VS Code extension (thin TypeScript client — ADR-0005) | ⬜ | 10% |
 | 13 | Examples, golden cases, prompts, polish | ◐ started | 2% |
 
-**Done so far: items 1–3 ≈ 22%.**
+**Done so far: items 1–5 ≈ 36%.**
 
 Two caveats:
 - *Effort-weighted, not feature-count.* By count it's 3 of ~13 (~23%), but the remaining
@@ -311,12 +311,14 @@ waiting for those agents.
 
 ---
 
-## Milestone 4 — Exposing the Parser over HTTP
+## Milestone 4 — HTTP API & First LLM Agent
 
-> **Status:** In progress. Step 1 (the parse endpoint, below) is complete and tested.
-> Step 2 — the first LLM-backed agent (`BusinessRuleExtractor`) — is next.
+> **Status:** Step 1 (parse endpoint) and Step 2 (LLM-backed `BusinessRuleExtractor`
+> + `/business-rules` endpoint) are complete and tested.
 
-**Goal (Step 1):** expose `RequirementParserService` over a real HTTP endpoint so the
+### Step 1 — Expose the parser over HTTP
+
+**Goal:** expose `RequirementParserService` over a real HTTP endpoint so the
 VS Code thin client (ADR-0005) has something to call — while staying fully
 deterministic. This is the first **client-facing entry point**, and the
 request/response pattern set here is the same one the future `POST /generate`
@@ -399,17 +401,89 @@ cd backend && source .venv/bin/activate
 uvicorn app.main:app --reload      # open http://127.0.0.1:8000/docs
 ```
 
+### Step 2 — First LLM-backed agent (`BusinessRuleExtractor`)
+
+**Goal:** cross from the deterministic spine into the probabilistic zone — infer a
+requirement's **business rules** with a local LLM — while keeping the code
+vendor-agnostic and testable offline.
+
+#### Port & Adapter (Hexagonal) architecture
+
+Agents depend on an abstraction *we* own, never on a vendor SDK (ADR-0002):
+
+```
+  BusinessRuleExtractor ──► LLMProvider (PORT)  .complete(prompt) -> str
+                                  ▲      ▲       ▲
+                          OllamaProvider │   (Claude / OpenAI later)
+                                         │
+                                   FakeProvider (tests)
+```
+
+#### Components
+
+| File | Role |
+| --- | --- |
+| `app/providers/base.py` | `LLMProvider` — a `typing.Protocol` port: `complete(prompt) -> str` |
+| `app/providers/ollama_provider.py` | `OllamaProvider` adapter — calls Ollama's `/api/generate` via `httpx`; env `OLLAMA_HOST` / `OLLAMA_MODEL`; failures wrapped in `OllamaError` |
+| `app/providers/factory.py` | `get_llm_provider()` — selects the backend from `LLM_PROVIDER` (default `ollama`) |
+| `app/agents/business_rule_extractor.py` | `BusinessRuleExtractor.extract(req) -> list[str]` |
+
+#### Taming non-deterministic output
+
+`extract()` turns messy LLM text into a validated `list[str]`:
+1. **Prompt for JSON** of an exact shape (`{"business_rules": [...]}`), with an
+   explicit empty case.
+2. **Extract** the object from first `{` to last `}` — tolerates prose / ```json fences.
+3. **Validate** with a Pydantic schema (wrong key/type → `ValidationError`).
+4. **Retry once**; on persistent failure raise `BusinessRuleExtractionError` (never
+   silently return `[]`, which would masquerade as "no rules").
+
+The agent returns the rules; it does **not** mutate the `Requirement` (pure, composable).
+
+#### The endpoint — a baby orchestrator
+
+`POST /requirements/business-rules` (body `{ "markdown": "..." }`) composes the first
+two pipeline stages:
+
+```python
+requirement = parser.parse(request.markdown)                  # deterministic
+requirement.business_rules = extractor.extract(requirement)   # probabilistic
+return requirement
+```
+
+The provider is injected via `Depends(get_llm_provider)`. Tests override that **leaf**
+dependency with a fake — so the route, parser, extractor, and JSON validation all run
+for real while only the network call is faked.
+
+#### Testing probabilistic code, deterministically
+
+| Test file | What it proves |
+| --- | --- |
+| `tests/test_business_rule_extractor.py` (7) | prompt building, JSON extraction, validation, retry, error — via `FakeProvider`, offline |
+| `tests/test_business_rules_api.py` (2) | the endpoint end-to-end with the provider overridden |
+| `tests/test_ollama_provider.py` (1) | live smoke test — **auto-skips** when Ollama isn't running |
+
+Suite total: **38 passed, 1 skipped**. `httpx` was promoted from a dev-only dep to a
+runtime dep (the adapter uses it), so it now lives in `requirements.txt`.
+
+#### Run it for real (optional)
+
+```bash
+ollama pull llama3.1 && ollama serve      # terminal 1
+cd backend && source .venv/bin/activate
+uvicorn app.main:app --reload             # terminal 2 → POST to /requirements/business-rules
+```
+
 ---
 
-## What's next (Milestone 4 · Step 2 and beyond)
+## What's next
 
-- **`BusinessRuleExtractor`** — the first LLM-backed agent. Introduces the pluggable
-  provider (ADR-0002, via the `claude-api` integration) and fills
-  `Requirement.business_rules`. This is the first step across the deterministic →
-  probabilistic line.
-- Then: `RiskAnalyzer`, RAG over existing tests (ChromaDB, ADR-0003), coverage-gap
-  detection, the `TestGeneratorAgent`, and the orchestrator (`POST /generate`,
-  ADR-0004).
+- **`RiskAnalyzer`** — the next LLM agent; reuses the exact `LLMProvider` port and the
+  prompt → validate → retry pattern, filling `Requirement.risks`.
+- Then: RAG over existing tests (ChromaDB, ADR-0003), coverage-gap detection, the
+  `TestGeneratorAgent`, and the full orchestrator (`POST /generate`, ADR-0004).
+- A **Claude adapter** (`claude-api` skill) and an **OpenAI adapter** — each just a new
+  `complete()` implementation behind the same port.
 
 Open question still parked: should `feature` get a `min_length=1` constraint on the
 model, or should that validation live in a separate layer? (See §3.4.)
