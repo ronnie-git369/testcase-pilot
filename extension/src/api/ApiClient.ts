@@ -22,7 +22,8 @@ import { buildUrl } from "./endpoints";
 export type FetchFn = typeof fetch;
 
 export interface ApiClientOptions {
-  baseUrl: string;
+  /** A base URL string, or a getter resolved per request (for live settings). */
+  baseUrl: string | (() => string);
   timeoutMs?: number;
   maxRetries?: number;
   /** Injectable for tests; defaults to the global fetch. */
@@ -36,7 +37,7 @@ const DEFAULT_MAX_RETRIES = 2;
 const BASE_BACKOFF_MS = 250;
 
 export class ApiClient {
-  private readonly baseUrl: string;
+  private readonly baseUrl: string | (() => string);
   private readonly timeoutMs: number;
   private readonly maxRetries: number;
   private readonly fetchFn: FetchFn;
@@ -64,7 +65,8 @@ export class ApiClient {
     path: string,
     body?: unknown
   ): Promise<T> {
-    const url = buildUrl(this.baseUrl, path);
+    const base = typeof this.baseUrl === "function" ? this.baseUrl() : this.baseUrl;
+    const url = buildUrl(base, path);
     let lastError: ApiError | undefined;
 
     for (let attempt = 0; attempt <= this.maxRetries; attempt++) {

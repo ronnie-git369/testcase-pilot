@@ -11,6 +11,8 @@
 
 import * as vscode from "vscode";
 
+import { COMMANDS } from "../config/constants";
+
 export class StatusBar {
   private readonly item: vscode.StatusBarItem;
 
@@ -19,6 +21,8 @@ export class StatusBar {
       vscode.StatusBarAlignment.Left,
       100
     );
+    // Clicking the item runs the health check (registered in this milestone).
+    this.item.command = COMMANDS.checkBackendStatus;
     this.idle();
     this.item.show();
   }
