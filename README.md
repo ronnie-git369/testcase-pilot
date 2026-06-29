@@ -147,6 +147,12 @@ Pinned in [`backend/requirements.txt`](backend/requirements.txt):
 - **pydantic** / **pydantic-core** — request/response models and validation
 - **starlette**, **anyio**, **h11** — ASGI/async plumbing (FastAPI dependencies)
 
+## Documentation
+
+- [**Milestone Walkthrough (M1–M3)**](docs/milestones.md) — how the project was built so
+  far and *why*, with the Requirement Analysis Engine documented in depth
+- [System Architecture](docs/architecture.md) · [Architecture Decision Records](docs/adr/README.md) · [Diagrams](docs/diagrams/README.md)
+
 ## Roadmap
 
 - [x] Backend application entrypoint (`app/main.py` with root banner + `/health`)

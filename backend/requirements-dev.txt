@@ -1,0 +1,13 @@
+# Development & test dependencies (NOT required to run the app in production).
+#
+# Install with:  pip install -r requirements-dev.txt
+# This pulls in everything from requirements.txt, then layers dev-only tools.
+# Pinned (incl. transitive) to match the project's reproducible-build convention.
+
+-r requirements.txt
+
+iniconfig==2.1.0
+packaging==26.2
+pluggy==1.6.0
+pytest==8.4.2
+tomli==2.4.1

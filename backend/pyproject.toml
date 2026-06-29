@@ -1,0 +1,13 @@
+# Project tooling configuration.
+# For now this only configures pytest. Run tests from inside backend/ with:  pytest
+
+[tool.pytest.ini_options]
+# Where pytest looks for tests.
+testpaths = ["tests"]
+
+# Add backend/ (".") to sys.path so tests can do `from app.models import ...`
+# without packaging the app or fiddling with PYTHONPATH. Requires pytest >= 7.
+pythonpath = ["."]
+
+# Sensible defaults: verbose output, show local vars on failure.
+addopts = "-v"
