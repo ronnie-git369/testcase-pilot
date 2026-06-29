@@ -37,7 +37,7 @@ spine, and Milestone 4 puts an HTTP face on it — both still fully deterministi
 
 ---
 
-## Project progress — ~88% complete
+## Project progress — ~98% complete
 
 > An **effort-weighted** estimate (not a feature count). Checked items are built and
 > tested; the remaining items are individually heavier — RAG, test generation, and the
@@ -56,10 +56,10 @@ spine, and Milestone 4 puts an HTTP face on it — both still fully deterministi
 | 9 | `TestGeneratorAgent` (manual cases) | ✅ done | 12% |
 | 10 | Self-review / critique step (`SelfReviewer`) | ✅ done | 6% |
 | 11 | Orchestrator pipeline + `POST /requirements/generate` (ADR-0004) | ✅ done | 8% |
-| 12 | VS Code extension (thin TypeScript client — ADR-0005) | ⬜ next | 10% |
-| 13 | Examples, golden cases, prompts, polish | ◐ started | 2% |
+| 12 | VS Code extension (thin TypeScript client — ADR-0005) | ✅ done | 10% |
+| 13 | Examples, golden cases, prompts, polish | ◐ ongoing | 2% |
 
-**Done so far: items 1–11 ≈ 88%.**
+**Done so far: items 1–12 ≈ 98%.** (Item 13 — examples/polish — is ongoing.)
 
 Two caveats:
 - *Effort-weighted, not feature-count.* By count it's 3 of ~13 (~23%), but the remaining
@@ -634,16 +634,37 @@ response per stage). Suite: **76 passed, 1 skipped**.
 
 ---
 
+## Milestone 10 — VS Code Extension (item #12)
+
+The thin client that makes TestCasePilot usable where QA engineers work (ADR-0005).
+Lives in `extension/` — a different stack (TypeScript + the VS Code API), so no pytest.
+
+- **Command** `TestCasePilot: Generate Test Cases` — takes the active editor's content
+  (or selection), POSTs it to `/requirements/generate`, and opens the result as a
+  formatted Markdown report in a new tab.
+- **Thin by design:** all reasoning stays server-side; the extension only sends the
+  requirement and renders the response.
+- **Structure:** `src/api.ts` (typed backend client), `src/render.ts` (pure
+  `GenerationResult → Markdown`, unit-tested), `src/extension.ts` (command + VS Code
+  wiring). Config: `testcasePilot.apiUrl`.
+- **Build/verify:** `npm install && npm run compile` (tsc, strict) type-checks the
+  client; `npm test` runs 4 renderer unit tests via Node's built-in test runner.
+- **Run it:** press **F5** in VS Code (Extension Development Host) with the backend up.
+
+Backend suite still **76 passed, 1 skipped**; extension **compiles + 4 tests pass**.
+
+---
+
 ## What's next
 
-- **VS Code extension (item #12):** the thin TypeScript client (ADR-0005) that POSTs a
-  requirement to `/requirements/generate` and renders the review-ready cases — the last
-  backend-side milestone before the product is end-to-end usable.
-- Additional provider adapters: a **Claude** adapter (`claude-api` skill) and **OpenAI**,
-  each just a new `complete()` behind the same port.
+The product is now **end-to-end usable**: requirement in the editor → review-ready test
+cases. Remaining polish (item #13) and optional enhancements:
 
-Open question still parked: should `feature` get a `min_length=1` constraint on the
-model, or should that validation live in a separate layer? (See §3.4.)
+- A **Claude** adapter (`claude-api` skill) and **OpenAI** adapter — each just a new
+  `complete()` behind the existing `LLMProvider` port — to run against hosted models.
+- More example requirements / golden outputs in `examples/`, and richer extension UX
+  (a webview instead of a Markdown tab; an ingest command for `/retrieval/index`).
+- VS Code integration tests (`@vscode/test-electron`) and backend CI.
 
 Open question still parked: should `feature` get a `min_length=1` constraint on the
 model, or should that validation live in a separate layer? (See §3.4.)

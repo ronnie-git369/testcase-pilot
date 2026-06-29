@@ -1,0 +1,45 @@
+{
+  "name": "testcasepilot",
+  "displayName": "TestCasePilot",
+  "description": "Generate review-ready QA test cases from a requirement using the TestCasePilot backend.",
+  "version": "0.1.0",
+  "publisher": "testcasepilot",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Testing",
+    "Other"
+  ],
+  "activationEvents": [],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "testcasePilot.generate",
+        "title": "TestCasePilot: Generate Test Cases"
+      }
+    ],
+    "configuration": {
+      "title": "TestCasePilot",
+      "properties": {
+        "testcasePilot.apiUrl": {
+          "type": "string",
+          "default": "http://127.0.0.1:8000",
+          "description": "Base URL of the TestCasePilot backend API."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "test": "node --test out/*.test.js",
+    "vscode:prepublish": "npm run compile"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "@types/vscode": "^1.85.0",
+    "typescript": "^5.4.0"
+  }
+}

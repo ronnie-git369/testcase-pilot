@@ -540,11 +540,10 @@ examples/existing_tests.json   # sample corpus to ingest via /retrieval/index
 
 ## 10. What's coming
 
-The full backend pipeline is now in place (through `POST /requirements/generate`). What
-remains builds on the same patterns:
+The full backend pipeline is in place (through `POST /requirements/generate`), and a thin
+**VS Code extension** (in `extension/`) already calls it (ADR-0005). What remains builds
+on the same patterns:
 
-- A **VS Code extension** (thin TypeScript client) that POSTs a requirement to
-  `/requirements/generate` and renders the review-ready cases. See
-  [ADR-0005](./adr/0005-vscode-extension-thin-client.md).
 - Additional provider adapters (Claude, OpenAI) — each a new `complete()` behind the
   same port. See [ADR-0002](./adr/0002-pluggable-llm-provider.md).
+- Richer extension UX (a webview; an ingest command for `/retrieval/index`) and CI.

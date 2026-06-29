@@ -150,20 +150,20 @@ Pinned in [`backend/requirements.txt`](backend/requirements.txt):
 ## Documentation
 
 - [**Milestone Walkthrough**](docs/milestones.md) — how the project was built so far and
-  *why*, with a progress tracker (currently ~88%)
+  *why*, with a progress tracker (currently ~98%)
 - [**API Reference & Guide**](docs/api.md) — endpoints, how a request flows, and how to run the API
 - [System Architecture](docs/architecture.md) · [Architecture Decision Records](docs/adr/README.md) · [Diagrams](docs/diagrams/README.md)
 
 ## Roadmap
 
 - [x] Backend application entrypoint (`app/main.py` with root banner + `/health`)
-- [ ] API routes (`app/api/routes.py`)
-- [ ] Agent orchestration pipeline (analyze → extract → risk → retrieve → gap → generate → review)
-- [ ] ChromaDB-backed RAG over existing test cases
-- [ ] Pluggable LLM providers (OpenAI / Claude / Ollama)
-- [ ] VS Code extension client
-- [ ] Example requirements and golden test cases
-- [ ] Test suite
+- [x] API routes (`app/api/routes.py`) — parse, business-rules, risks, coverage, generate, retrieval
+- [x] Agent orchestration pipeline (analyze → extract → risk → retrieve → gap → generate → review)
+- [x] ChromaDB-backed RAG over existing test cases
+- [x] Pluggable LLM providers — `LLMProvider` port + Ollama adapter (Claude/OpenAI adapters TBD)
+- [x] VS Code extension client (thin TypeScript client in `extension/`)
+- [x] Example requirements and golden test cases (`examples/`; more TBD)
+- [x] Test suite (77 backend tests + extension renderer tests)
 
 ## License
 
