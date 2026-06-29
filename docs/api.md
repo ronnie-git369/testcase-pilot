@@ -10,8 +10,9 @@
 ## 1. Overview
 
 The backend is a **FastAPI** application that exposes TestCasePilot's logic over HTTP.
-Today it serves a deterministic, LLM-free endpoint that turns a Markdown requirement
-into a structured `Requirement` object, plus basic service/health routes.
+It serves a deterministic parse endpoint (Markdown → structured `Requirement`), two
+LLM-backed analysis endpoints (business rules, risks), and basic service/health routes.
+The deterministic and probabilistic parts are cleanly separated (see §3).
 
 | Aspect | Detail |
 | --- | --- |
@@ -60,6 +61,25 @@ Then open **http://127.0.0.1:8000/docs** in a browser for the interactive UI.
 
 > **Tip (inside a Claude Code session):** prefix the command with `!` to run it in the
 > session, e.g. `! cd backend && source .venv/bin/activate && uvicorn app.main:app --reload`.
+
+### LLM provider (only for the analysis endpoints)
+
+`GET /`, `/health`, and `POST /requirements/parse` are deterministic and need **no**
+provider. The LLM-backed endpoints (`/requirements/business-rules`, `/requirements/risks`)
+call a language model selected by environment variables (ADR-0002):
+
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `LLM_PROVIDER` | `ollama` | Which backend to use (only `ollama` is implemented today) |
+| `OLLAMA_HOST` | `http://localhost:11434` | Ollama server URL |
+| `OLLAMA_MODEL` | `llama3.1` | Model name |
+
+For the default (Ollama), install [Ollama](https://ollama.com), then:
+```bash
+ollama pull llama3.1 && ollama serve
+```
+Without a reachable provider, the deterministic routes still work; the analysis
+endpoints return a `502`/`500`-class error when the model can't be reached.
 
 ---
 
@@ -241,6 +261,64 @@ curl -i -X POST http://127.0.0.1:8000/requirements/parse \
 # HTTP/1.1 422 Unprocessable Entity
 ```
 
+### `POST /requirements/business-rules`
+Parse the Markdown, then fill `business_rules` using the LLM agent
+(`BusinessRuleExtractor`). **Requires a reachable LLM provider** (see §2).
+
+This composes two pipeline stages: deterministic `parse` → probabilistic
+`extract`.
+
+**Request body:** same as `/parse` — `{ "markdown": "..." }`.
+
+**Responses:**
+
+| Status | When | Body |
+| --- | --- | --- |
+| `200 OK` | Rules extracted (or none found) | a `Requirement` with `business_rules` populated |
+| `422` | `markdown` missing/not a string | validation error |
+| `500`-class | LLM unreachable or unparseable after a retry | error |
+
+```bash
+curl -X POST http://127.0.0.1:8000/requirements/business-rules \
+  -H "Content-Type: application/json" \
+  -d '{"markdown":"# Feature: Login\n## Acceptance Criteria\n- account locks after 5 failed attempts"}'
+```
+```json
+{
+  "feature": "Login",
+  "user_story": "",
+  "acceptance_criteria": ["account locks after 5 failed attempts"],
+  "business_rules": ["Lock the account after 5 consecutive failed attempts"],
+  "risks": [],
+  "notes": []
+}
+```
+
+### `POST /requirements/risks`
+Parse the Markdown, then fill `risks` using the LLM agent (`RiskAnalyzer`). If the
+`Requirement` already carries `business_rules`, the prompt uses them for sharper risks.
+**Requires a reachable LLM provider** (see §2).
+
+**Request body:** same as `/parse` — `{ "markdown": "..." }`.
+
+**Responses:** same status table as `/business-rules`, but populates `risks`.
+
+```bash
+curl -X POST http://127.0.0.1:8000/requirements/risks \
+  -H "Content-Type: application/json" \
+  -d '{"markdown":"# Feature: Login\n## Acceptance Criteria\n- account locks after 5 failed attempts"}'
+```
+```json
+{
+  "feature": "Login",
+  "user_story": "",
+  "acceptance_criteria": ["account locks after 5 failed attempts"],
+  "business_rules": [],
+  "risks": ["Brute-force attacks against the login form"],
+  "notes": []
+}
+```
+
 ---
 
 ## 6. Schemas
@@ -256,8 +334,8 @@ curl -i -X POST http://127.0.0.1:8000/requirements/parse \
 | `feature` | string | parser | Required; defaults to `"Untitled"` if no heading found |
 | `user_story` | string | parser | `""` if no `## User Story` section |
 | `acceptance_criteria` | string[] | parser | bullets under `## Acceptance Criteria` |
-| `business_rules` | string[] | *future agent* | always `[]` today |
-| `risks` | string[] | *future agent* | always `[]` today |
+| `business_rules` | string[] | `BusinessRuleExtractor` | filled by `/business-rules`; `[]` from `/parse` |
+| `risks` | string[] | `RiskAnalyzer` | filled by `/risks`; `[]` from `/parse` |
 | `notes` | string[] | parser | breadcrumbs (e.g. defaulted-feature note) |
 
 The expected input Markdown shape and parsing rules are documented in the
@@ -287,9 +365,11 @@ pytest                 # runs unit + API tests (config in pyproject.toml)
 pytest tests/test_api.py -v   # just the API tests
 ```
 
-`tests/test_api.py` covers: a structured 200 response, the permissive-empty case, and
-the 422-on-missing-field case. (API tests prove the *wiring*; the service's unit tests
-prove the *logic*.)
+The LLM-backed endpoints are tested with the **provider dependency overridden** by a
+fake (`app.dependency_overrides[get_llm_provider]`), so the route, parser, agent, and
+JSON validation all run for real while only the network call is faked — no model, key,
+or cost. The real `OllamaProvider` has a smoke test that **auto-skips** when Ollama
+isn't running. (API tests prove the *wiring*; the agents' unit tests prove the *logic*.)
 
 ---
 
@@ -300,23 +380,33 @@ backend/app/
 ├── main.py              # FastAPI app + router wiring (composition root)
 ├── api/
 │   ├── __init__.py      # exports the router
-│   └── routes.py        # APIRouter, ParseRequirementRequest, get_parser, /parse
+│   └── routes.py        # APIRouter + routes: /parse, /business-rules, /risks
+│                        #   + DI providers (get_parser, get_*_extractor/analyzer)
 ├── services/
-│   └── requirement_parser.py   # RequirementParserService.parse()
+│   └── requirement_parser.py   # RequirementParserService.parse()  (deterministic)
+├── agents/                      # LLM-backed agents
+│   ├── business_rule_extractor.py   # BusinessRuleExtractor.extract()
+│   └── risk_analyzer.py             # RiskAnalyzer.analyze()
+├── providers/                   # LLM provider port + adapters (ADR-0002)
+│   ├── base.py          # LLMProvider Protocol (the port)
+│   ├── ollama_provider.py   # OllamaProvider adapter (httpx -> Ollama)
+│   └── factory.py       # get_llm_provider() — selects backend from env
 └── models/
     └── requirement.py   # Requirement (response model / domain entity)
-backend/tests/test_api.py       # TestClient-based API tests
+backend/tests/           # *_parser, *_api, *_extractor, *_analyzer, *_provider tests
 ```
 
 ---
 
 ## 10. What's coming
 
-The same patterns (router, request/response models, dependency injection) will host the
-agentic pipeline:
+The same patterns (router, request/response models, dependency injection, the
+`LLMProvider` port) will host the rest of the agentic pipeline:
 
-- `POST /generate` — the orchestrator endpoint (analyze → extract rules → risk →
-  retrieve (RAG) → coverage gaps → generate → self-review). See
+- RAG over existing tests (ChromaDB — [ADR-0003](./adr/0003-rag-with-chromadb.md)),
+  coverage-gap detection, and the `TestGeneratorAgent`.
+- `POST /generate` — the orchestrator endpoint chaining all stages (analyze → extract
+  rules → risk → retrieve → coverage gaps → generate → self-review). See
   [ADR-0004](./adr/0004-agent-orchestration-pipeline.md).
-- A pluggable LLM provider injected via the same `Depends` mechanism. See
-  [ADR-0002](./adr/0002-pluggable-llm-provider.md).
+- Additional provider adapters (Claude, OpenAI) — each a new `complete()` behind the
+  same port. See [ADR-0002](./adr/0002-pluggable-llm-provider.md).

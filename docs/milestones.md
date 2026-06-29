@@ -37,7 +37,7 @@ spine, and Milestone 4 puts an HTTP face on it — both still fully deterministi
 
 ---
 
-## Project progress — ~36% complete
+## Project progress — ~42% complete
 
 > An **effort-weighted** estimate (not a feature count). Checked items are built and
 > tested; the remaining items are individually heavier — RAG, test generation, and the
@@ -50,8 +50,8 @@ spine, and Milestone 4 puts an HTTP face on it — both still fully deterministi
 | 3 | `POST /requirements/parse` endpoint (M4 · Step 1) | ✅ done | 4% |
 | 4 | Pluggable LLM provider port + Ollama adapter (ADR-0002) | ✅ done | 8% |
 | 5 | `BusinessRuleExtractor` agent + `/business-rules` endpoint | ✅ done | 6% |
-| 6 | `RiskAnalyzer` agent | ⬜ next | 6% |
-| 7 | RAG over existing tests (ChromaDB — ADR-0003) | ⬜ | 12% |
+| 6 | `RiskAnalyzer` agent + `/risks` endpoint | ✅ done | 6% |
+| 7 | RAG over existing tests (ChromaDB — ADR-0003) | ⬜ next | 12% |
 | 8 | Coverage-gap detection | ⬜ | 8% |
 | 9 | `TestGeneratorAgent` (manual + Playwright cases) | ⬜ | 12% |
 | 10 | Self-review / critique step | ⬜ | 6% |
@@ -59,7 +59,7 @@ spine, and Milestone 4 puts an HTTP face on it — both still fully deterministi
 | 12 | VS Code extension (thin TypeScript client — ADR-0005) | ⬜ | 10% |
 | 13 | Examples, golden cases, prompts, polish | ◐ started | 2% |
 
-**Done so far: items 1–5 ≈ 36%.**
+**Done so far: items 1–6 ≈ 42%.**
 
 Two caveats:
 - *Effort-weighted, not feature-count.* By count it's 3 of ~13 (~23%), but the remaining

@@ -9,5 +9,11 @@ from app.agents.business_rule_extractor import (
     BusinessRuleExtractionError,
     BusinessRuleExtractor,
 )
+from app.agents.risk_analyzer import RiskAnalysisError, RiskAnalyzer
 
-__all__ = ["BusinessRuleExtractor", "BusinessRuleExtractionError"]
+__all__ = [
+    "BusinessRuleExtractor",
+    "BusinessRuleExtractionError",
+    "RiskAnalyzer",
+    "RiskAnalysisError",
+]

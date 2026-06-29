@@ -10,7 +10,7 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel, Field
 
-from app.agents import BusinessRuleExtractor
+from app.agents import BusinessRuleExtractor, RiskAnalyzer
 from app.models import Requirement
 from app.providers import LLMProvider, get_llm_provider
 from app.services import RequirementParserService
@@ -76,4 +76,23 @@ def extract_business_rules(
     """
     requirement = parser.parse(request.markdown)
     requirement.business_rules = extractor.extract(requirement)
+    return requirement
+
+
+def get_risk_analyzer(
+    provider: LLMProvider = Depends(get_llm_provider),
+) -> RiskAnalyzer:
+    """Provide the risk analyzer with an injected (env-configured) LLM provider."""
+    return RiskAnalyzer(provider)
+
+
+@router.post("/risks", response_model=Requirement)
+def analyze_risks(
+    request: ParseRequirementRequest,
+    parser: RequirementParserService = Depends(get_parser),
+    analyzer: RiskAnalyzer = Depends(get_risk_analyzer),
+) -> Requirement:
+    """Parse Markdown, then fill in testing risks via the LLM agent."""
+    requirement = parser.parse(request.markdown)
+    requirement.risks = analyzer.analyze(requirement)
     return requirement
