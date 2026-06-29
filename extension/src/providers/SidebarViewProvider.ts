@@ -13,10 +13,16 @@ import {
   type PipelineStep,
   type StepStatus,
 } from "../models/pipeline";
-import type { HostToWebview, WebviewToHost } from "../models/messages";
+import type {
+  ExportFormat,
+  HostToWebview,
+  WebviewToHost,
+} from "../models/messages";
 import type { GenerationResult } from "../models/requirement";
+import { toJsonExport, toMarkdownExport } from "../services/exporter";
 import type { PipelineService } from "../services/PipelineService";
 import { renderReport } from "../services/render";
+import type { WorkspaceService } from "../services/WorkspaceService";
 import type { Logger } from "../utils/logger";
 import type { StatusBar } from "../utils/statusBar";
 import { renderSidebarHtml } from "../views/webviewHtml";
@@ -43,7 +49,8 @@ export class SidebarViewProvider implements vscode.WebviewViewProvider {
     private readonly extensionUri: vscode.Uri,
     private readonly logger: Logger,
     private readonly pipeline: PipelineService,
-    private readonly statusBar: StatusBar
+    private readonly statusBar: StatusBar,
+    private readonly workspace: WorkspaceService
   ) {}
 
   resolveWebviewView(webviewView: vscode.WebviewView): void {
@@ -90,9 +97,7 @@ export class SidebarViewProvider implements vscode.WebviewViewProvider {
         this.useActiveEditor();
         break;
       case "export":
-        // Wired in Milestone 9 (WorkspaceService).
-        this.logger.info(`Sidebar: export ${message.format} (lands in M9).`);
-        this.post({ type: "log", text: "Export lands in M9." });
+        void this.exportResult(message.format);
         break;
     }
   }
@@ -187,15 +192,37 @@ export class SidebarViewProvider implements vscode.WebviewViewProvider {
 
   /** Pull the active editor's text (selection or whole doc) into the textarea. */
   private useActiveEditor(): void {
-    const editor = vscode.window.activeTextEditor;
-    if (!editor) {
+    const text = this.workspace.getActiveText();
+    if (text === undefined) {
       this.post({ type: "log", text: "No active editor." });
       return;
     }
-    const { selection, document } = editor;
-    const text = selection.isEmpty
-      ? document.getText()
-      : document.getText(selection);
     this.post({ type: "setMarkdown", markdown: text });
+  }
+
+  /** Export the last analysis to a Markdown or JSON file (with confirmation). */
+  private async exportResult(format: ExportFormat): Promise<void> {
+    if (!this.lastResult) {
+      this.post({ type: "log", text: "Run Analyze first." });
+      return;
+    }
+    const payload =
+      format === "json"
+        ? toJsonExport(this.lastResult)
+        : toMarkdownExport(this.lastResult);
+
+    const uri = await this.workspace.saveArtifact(
+      payload.fileName,
+      payload.content
+    );
+    if (uri) {
+      this.logger.info(`Exported ${format} -> ${uri.fsPath}`);
+      this.post({ type: "log", text: `Saved ${payload.fileName}` });
+      void vscode.window.showInformationMessage(
+        `TestCasePilot: saved ${vscode.workspace.asRelativePath(uri)}.`
+      );
+    } else {
+      this.post({ type: "log", text: "Export cancelled." });
+    }
   }
 }

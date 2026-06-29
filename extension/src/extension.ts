@@ -14,6 +14,7 @@ import { RequirementCodeLensProvider } from "./providers/RequirementCodeLensProv
 import { SidebarViewProvider } from "./providers/SidebarViewProvider";
 import { BackendService } from "./services/BackendService";
 import { PipelineService } from "./services/PipelineService";
+import { WorkspaceService } from "./services/WorkspaceService";
 import { Logger } from "./utils/logger";
 import { StatusBar } from "./utils/statusBar";
 
@@ -25,11 +26,13 @@ export function activate(context: vscode.ExtensionContext): void {
   // changing `testcasePilot.apiUrl` in Settings takes effect live.
   const backend = new BackendService(new ApiClient({ baseUrl: getApiUrl }));
   const pipeline = new PipelineService(backend);
+  const workspace = new WorkspaceService();
   const sidebar = new SidebarViewProvider(
     context.extensionUri,
     logger,
     pipeline,
-    statusBar
+    statusBar,
+    workspace
   );
 
   logger.info("TestCasePilot activated.");
