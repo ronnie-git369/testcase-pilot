@@ -38,6 +38,24 @@
         }
       ]
     },
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "testcasePilot",
+          "title": "TestCasePilot",
+          "icon": "$(beaker)"
+        }
+      ]
+    },
+    "views": {
+      "testcasePilot": [
+        {
+          "id": "testcasePilot.sidebar",
+          "name": "TestCasePilot",
+          "type": "webview"
+        }
+      ]
+    },
     "configuration": {
       "title": "TestCasePilot",
       "properties": {

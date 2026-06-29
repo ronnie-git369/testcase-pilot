@@ -9,7 +9,9 @@ import * as vscode from "vscode";
 
 import { ApiClient } from "./api/ApiClient";
 import { registerCommands } from "./commands";
+import { SIDEBAR_VIEW_ID } from "./config/constants";
 import { getApiUrl } from "./config/settings";
+import { SidebarViewProvider } from "./providers/SidebarViewProvider";
 import { BackendService } from "./services/BackendService";
 import { Logger } from "./utils/logger";
 import { StatusBar } from "./utils/statusBar";
@@ -26,6 +28,15 @@ export function activate(context: vscode.ExtensionContext): void {
   context.subscriptions.push(logger, statusBar);
 
   registerCommands(context, { backend, logger, statusBar });
+
+  // The persistent sidebar (Activity Bar). retainContextWhenHidden keeps its
+  // state when the user switches away and back.
+  const sidebar = new SidebarViewProvider(context.extensionUri, logger);
+  context.subscriptions.push(
+    vscode.window.registerWebviewViewProvider(SIDEBAR_VIEW_ID, sidebar, {
+      webviewOptions: { retainContextWhenHidden: true },
+    })
+  );
 
   // Fire-and-forget initial probe so the status bar reflects reality at startup
   // (no toast — that's reserved for the explicit "Check Backend Status" command).
