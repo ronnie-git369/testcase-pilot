@@ -41,6 +41,22 @@
           "type": "string",
           "default": "http://127.0.0.1:8000",
           "description": "Base URL of the TestCasePilot backend API."
+        },
+        "testcasePilot.defaultProvider": {
+          "type": "string",
+          "enum": ["auto", "openai", "claude", "ollama"],
+          "default": "auto",
+          "description": "Preferred AI provider hint forwarded to the backend. 'auto' lets the backend decide. The extension never calls a provider directly."
+        },
+        "testcasePilot.autoAnalyze": {
+          "type": "boolean",
+          "default": false,
+          "description": "Automatically analyze a requirement file when it is saved."
+        },
+        "testcasePilot.enableLogs": {
+          "type": "boolean",
+          "default": true,
+          "description": "Write API requests, errors, and timings to the 'TestCasePilot Output' channel."
         }
       }
     }
