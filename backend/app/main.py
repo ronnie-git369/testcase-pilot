@@ -2,12 +2,18 @@
 
 from fastapi import FastAPI
 
+from app.api import router as api_router
+
 app = FastAPI(
     title="TestCasePilot API",
     description="An Agentic AI QA assistant that generates enterprise-quality "
     "test cases from software requirements.",
     version="0.1.0",
 )
+
+# Mount feature routes (e.g. /requirements/parse). main.py stays the thin
+# composition root: it wires routers together but contains no route logic.
+app.include_router(api_router)
 
 
 @app.get("/")

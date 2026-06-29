@@ -1,8 +1,9 @@
-# TestCasePilot — Milestone Walkthrough (M1–M3)
+# TestCasePilot — Milestone Walkthrough (M1–M4)
 
 > A review-oriented narrative of how TestCasePilot has been built so far, and *why*
 > each decision was made. Milestones 1–2 cover the foundation and design; Milestone 3
-> is the first real engine and is documented in depth.
+> is the first real engine; Milestone 4 exposes it over HTTP. Milestones 3–4 are
+> documented in depth.
 >
 > Companion docs: [Architecture](./architecture.md) · [ADRs](./adr/README.md) ·
 > [Diagrams](./diagrams/README.md) · [Product Requirements](./product-requirements.md)
@@ -17,7 +18,7 @@ The build follows one guiding rule that you'll see repeated everywhere:
 
 A reliable, testable, deterministic spine is built first; the probabilistic
 (LLM-backed) agents will hang off it later. Milestone 3 is the first vertebra of that
-spine.
+spine, and Milestone 4 puts an HTTP face on it — both still fully deterministic.
 
 ```
         DETERMINISTIC ZONE                  │       PROBABILISTIC ZONE (later)
@@ -277,15 +278,105 @@ waiting for those agents.
 
 ---
 
-## What's next (Milestone 4)
+## Milestone 4 — Exposing the Parser over HTTP
 
-Two natural directions:
+> **Status:** In progress. Step 1 (the parse endpoint, below) is complete and tested.
+> Step 2 — the first LLM-backed agent (`BusinessRuleExtractor`) — is next.
 
-1. **Expose `parse()` over the API** (`POST /requirements/parse`) so the VS Code
-   extension has something to call — still deterministic; teaches FastAPI
-   request/response models. *(Recommended next.)*
-2. **First LLM-backed agent** (`BusinessRuleExtractor`) — introduces the pluggable
-   provider (ADR-0002) and the `claude-api` integration.
+**Goal (Step 1):** expose `RequirementParserService` over a real HTTP endpoint so the
+VS Code thin client (ADR-0005) has something to call — while staying fully
+deterministic. This is the first **client-facing entry point**, and the
+request/response pattern set here is the same one the future `POST /generate`
+(orchestrator) will follow.
 
-Open question to settle first: should `feature` get a `min_length=1` constraint on the
+### 4.1 The endpoint
+
+`POST /requirements/parse` — file `app/api/routes.py`, mounted in `app/main.py`.
+
+- **Request body (JSON):** `{ "markdown": "<raw markdown>" }` — a Pydantic DTO
+  (`ParseRequirementRequest`).
+- **Response body:** the `Requirement` directly (via `response_model=Requirement`).
+- **Empty / whitespace Markdown:** returns **200** with the permissively-defaulted
+  Requirement (`feature="Untitled"` + a `notes` breadcrumb) — consistent with the
+  parser, not a 422.
+- **Missing `markdown` field:** **422** (FastAPI request validation at the boundary).
+
+```
+POST /requirements/parse
+{ "markdown": "# Feature: Checkout\n## Acceptance Criteria\n- card payment succeeds" }
+
+200 OK
+{ "feature": "Checkout", "user_story": "",
+  "acceptance_criteria": ["card payment succeeds"],
+  "business_rules": [], "risks": [], "notes": [] }
+```
+
+### 4.2 Clean Architecture layering
+
+The dependency arrow points **inward**: HTTP → route → service → model. No inner layer
+knows about the outer ones.
+
+```
+ FastAPI / Uvicorn  (frameworks / drivers)
+   └─ app/api/routes.py          THIN adapter: HTTP <-> domain, no logic
+        └─ RequirementParserService    application logic
+             └─ Requirement             domain entity
+```
+
+Key choices:
+- **`main.py` is a composition root** — it only `include_router(...)`; it holds no
+  route logic.
+- **The service is injected** via FastAPI `Depends(get_parser)`, not constructed inside
+  the handler. This makes the route testable (override via `app.dependency_overrides`)
+  and is exactly where a configured, provider-aware instance will be wired in later
+  (ADR-0002) — it rehearses how the orchestrator will receive its LLM provider.
+- **DTO vs entity:** `ParseRequirementRequest` (an HTTP input shape) lives in the API
+  layer; `Requirement` (a domain entity) stays in `models/`. Different layers, different
+  reasons to change.
+- **`response_model=Requirement`** serializes the model, *filters* output to exactly its
+  fields, and publishes the schema to `/docs`.
+
+### 4.3 Tests — 3 API tests (29 total, all green)
+
+`backend/tests/test_api.py` uses FastAPI's `TestClient` to exercise the full HTTP stack
+(routing, validation, serialization):
+
+| Test | Asserts |
+| --- | --- |
+| structured response | well-formed doc → 200 with every field populated |
+| permissive empty | empty markdown → 200 with `Untitled` + breadcrumb |
+| required field | missing `markdown` → 422 |
+
+API tests prove the **wiring**; the M3 unit tests prove the **logic** — different
+layers, different tests.
+
+### 4.4 A dependency lesson
+
+`TestClient` needs `httpx`. Adding it surfaced a pre-existing gap: `anyio` was installed
+but its `sniffio` dependency was missing *and* unlisted — so the "fully pinned" claim
+wasn't actually true for transitive deps. Fixed by pinning `httpx`, `httpcore`,
+`certifi`, and `sniffio` in `requirements-dev.txt`. **Takeaway:** "fully pinned" only
+holds if it includes the *transitive* deps; environments drift when a transitive dep is
+satisfied-but-unlisted.
+
+### Try it
+
+```bash
+cd backend && source .venv/bin/activate
+uvicorn app.main:app --reload      # open http://127.0.0.1:8000/docs
+```
+
+---
+
+## What's next (Milestone 4 · Step 2 and beyond)
+
+- **`BusinessRuleExtractor`** — the first LLM-backed agent. Introduces the pluggable
+  provider (ADR-0002, via the `claude-api` integration) and fills
+  `Requirement.business_rules`. This is the first step across the deterministic →
+  probabilistic line.
+- Then: `RiskAnalyzer`, RAG over existing tests (ChromaDB, ADR-0003), coverage-gap
+  detection, the `TestGeneratorAgent`, and the orchestrator (`POST /generate`,
+  ADR-0004).
+
+Open question still parked: should `feature` get a `min_length=1` constraint on the
 model, or should that validation live in a separate layer? (See §3.4.)
