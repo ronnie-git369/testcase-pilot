@@ -471,7 +471,8 @@ backend/app/
 │   ├── json_support.py              # shared complete_json() helper (Rule of Three)
 │   ├── business_rule_extractor.py   # BusinessRuleExtractor.extract()
 │   ├── risk_analyzer.py             # RiskAnalyzer.analyze()
-│   └── coverage_analyzer.py         # CoverageAnalyzer.analyze() (LLM + retriever)
+│   ├── coverage_analyzer.py         # CoverageAnalyzer.analyze() (LLM + retriever)
+│   └── test_generator.py            # TestGeneratorAgent.generate() (not yet wired to HTTP)
 ├── providers/                   # LLM provider port + adapters (ADR-0002)
 │   ├── base.py          # LLMProvider Protocol (the port)
 │   ├── ollama_provider.py   # OllamaProvider adapter (httpx -> Ollama)
@@ -483,7 +484,8 @@ backend/app/
 │   └── factory.py       # get_retriever() — selects backend from env
 └── models/
     ├── requirement.py   # Requirement (response model / domain entity)
-    └── coverage.py      # CoverageReport (coverage endpoint response)
+    ├── coverage.py      # CoverageReport (coverage endpoint response)
+    └── test_case.py     # TestCase / TestSuite (generated output)
 backend/tests/           # parser, api, agent, provider, retrieval tests
 examples/existing_tests.json   # sample corpus to ingest via /retrieval/index
 ```
@@ -495,10 +497,9 @@ examples/existing_tests.json   # sample corpus to ingest via /retrieval/index
 The same patterns (router, request/response models, dependency injection, the
 `LLMProvider` port) will host the rest of the agentic pipeline:
 
-- The `TestGeneratorAgent` (generate cases from rules + risks + coverage gaps), then a
-  self-review pass.
+- A **self-review** pass that critiques and revises the generated cases.
 - `POST /generate` — the orchestrator endpoint chaining all stages (parse → rules → risk
-  → retrieve → coverage gaps → generate → self-review). See
-  [ADR-0004](./adr/0004-agent-orchestration-pipeline.md).
+  → retrieve → coverage gaps → generate → self-review), surfacing `TestGeneratorAgent`
+  over HTTP. See [ADR-0004](./adr/0004-agent-orchestration-pipeline.md).
 - Additional provider adapters (Claude, OpenAI) — each a new `complete()` behind the
   same port. See [ADR-0002](./adr/0002-pluggable-llm-provider.md).

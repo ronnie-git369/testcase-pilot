@@ -11,6 +11,7 @@ from app.agents.business_rule_extractor import (
 )
 from app.agents.coverage_analyzer import CoverageAnalysisError, CoverageAnalyzer
 from app.agents.risk_analyzer import RiskAnalysisError, RiskAnalyzer
+from app.agents.test_generator import TestGenerationError, TestGeneratorAgent
 
 __all__ = [
     "BusinessRuleExtractor",
@@ -19,4 +20,6 @@ __all__ = [
     "RiskAnalysisError",
     "CoverageAnalyzer",
     "CoverageAnalysisError",
+    "TestGeneratorAgent",
+    "TestGenerationError",
 ]

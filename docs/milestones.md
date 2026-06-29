@@ -37,7 +37,7 @@ spine, and Milestone 4 puts an HTTP face on it — both still fully deterministi
 
 ---
 
-## Project progress — ~62% complete
+## Project progress — ~74% complete
 
 > An **effort-weighted** estimate (not a feature count). Checked items are built and
 > tested; the remaining items are individually heavier — RAG, test generation, and the
@@ -53,13 +53,13 @@ spine, and Milestone 4 puts an HTTP face on it — both still fully deterministi
 | 6 | `RiskAnalyzer` agent + `/risks` endpoint | ✅ done | 6% |
 | 7 | RAG retrieval over existing tests (ChromaDB — ADR-0003) | ✅ done | 12% |
 | 8 | Coverage-gap detection (`CoverageAnalyzer` + `/coverage`) | ✅ done | 8% |
-| 9 | `TestGeneratorAgent` (manual + Playwright cases) | ⬜ next | 12% |
-| 10 | Self-review / critique step | ⬜ | 6% |
+| 9 | `TestGeneratorAgent` (manual cases) | ✅ done | 12% |
+| 10 | Self-review / critique step | ⬜ next | 6% |
 | 11 | Orchestrator pipeline + `POST /generate` (ADR-0004) | ⬜ | 8% |
 | 12 | VS Code extension (thin TypeScript client — ADR-0005) | ⬜ | 10% |
 | 13 | Examples, golden cases, prompts, polish | ◐ started | 2% |
 
-**Done so far: items 1–8 ≈ 62%.**
+**Done so far: items 1–9 ≈ 74%.**
 
 Two caveats:
 - *Effort-weighted, not feature-count.* By count it's 3 of ~13 (~23%), but the remaining
@@ -572,15 +572,36 @@ skipped**.
 
 ---
 
+## Milestone 7 — Test Generation (item #9)
+
+The payoff: `TestGeneratorAgent` turns the analysis into review-ready test cases.
+
+- **Models** (`app/models/test_case.py`): `TestCase { title, type, priority, steps,
+  expected_result, covers }` + `TestSuite { cases }`. `covers` ties each case to the
+  rule / risk / gap it addresses — the traceability a QA lead signs off on.
+- **Agent** (`app/agents/test_generator.py`): `generate(requirement, gaps=None) ->
+  list[TestCase]`. The *fourth* agent on `complete_json` — **zero** new parsing code;
+  only a new prompt + schema. Prompt carries gaps + rules + risks and is told to favor
+  depth over volume and not re-test what's covered. Pure; drops incomplete cases.
+- **Design notes:** `type`/`priority` are `str` (constrained by the prompt, not the
+  schema) so an odd LLM value is data to inspect, not a hard `ValidationError`.
+  "Playwright" output was deferred — runnable automation needs the app's selectors/URLs,
+  which the backend doesn't have; manual cases are the accurate, high-value output now.
+- **No endpoint yet** — generation is wired into the `POST /generate` orchestrator (#11).
+
+Tests: 5 offline unit tests (FakeProvider). Suite: **67 passed, 1 skipped**.
+
+---
+
 ## What's next
 
-- **`TestGeneratorAgent` (item #9):** generate manual + Playwright test cases from the
-  requirement's rules, risks, and the coverage **gaps** — finally producing the output
-  the whole pipeline exists to create.
-- Then: a self-review step (#10), the orchestrator (`POST /generate`, ADR-0004, #11),
-  and the VS Code extension (#12).
-- Additional provider adapters — a **Claude** adapter (`claude-api` skill) and **OpenAI**
-  — each just a new `complete()` behind the same port.
+- **Self-review / critique (item #10):** a pass that critiques the generated cases
+  (duplicates, missing edge cases, weak assertions) and revises — the "review its own
+  output" step from the vision.
+- **Orchestrator (`POST /generate`, ADR-0004, #11):** chain everything —
+  parse → rules → risk → retrieve → coverage → generate → self-review — into one call.
+- **VS Code extension (#12)** and additional provider adapters (**Claude** via the
+  `claude-api` skill, **OpenAI**) behind the same port.
 
 Open question still parked: should `feature` get a `min_length=1` constraint on the
 model, or should that validation live in a separate layer? (See §3.4.)
