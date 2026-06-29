@@ -65,6 +65,16 @@ export class SidebarViewProvider implements vscode.WebviewViewProvider {
     void this.view?.webview.postMessage(message);
   }
 
+  /**
+   * Public entry point for commands / CodeLens: load the given Markdown into the
+   * sidebar and run the pipeline. The caller is responsible for revealing the
+   * view first (e.g. via the `<viewId>.focus` command) so the webview exists.
+   */
+  public async analyzeMarkdown(markdown: string): Promise<void> {
+    this.post({ type: "setMarkdown", markdown });
+    await this.analyze(markdown);
+  }
+
   private onMessage(message: WebviewToHost): void {
     switch (message.type) {
       case "ready":

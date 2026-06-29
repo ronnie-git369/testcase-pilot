@@ -16,17 +16,25 @@
   "contributes": {
     "commands": [
       {
-        "command": "testcasePilot.newRequirement",
-        "title": "TestCasePilot: New Requirement (Form)",
-        "icon": "$(beaker)"
+        "command": "testcasePilot.analyzeRequirement",
+        "title": "TestCasePilot: Analyze Requirement"
       },
       {
         "command": "testcasePilot.generate",
         "title": "TestCasePilot: Generate Test Cases"
       },
       {
+        "command": "testcasePilot.openSidebar",
+        "title": "TestCasePilot: Open Sidebar"
+      },
+      {
         "command": "testcasePilot.checkBackendStatus",
         "title": "TestCasePilot: Check Backend Status"
+      },
+      {
+        "command": "testcasePilot.newRequirement",
+        "title": "TestCasePilot: New Requirement (Form)",
+        "icon": "$(beaker)"
       }
     ],
     "menus": {
@@ -35,6 +43,18 @@
           "command": "testcasePilot.newRequirement",
           "group": "navigation",
           "when": "resourceLangId == markdown"
+        }
+      ],
+      "editor/context": [
+        {
+          "command": "testcasePilot.generate",
+          "group": "testcasePilot",
+          "when": "editorLangId == markdown || editorLangId == plaintext"
+        },
+        {
+          "command": "testcasePilot.analyzeRequirement",
+          "group": "testcasePilot",
+          "when": "editorLangId == markdown || editorLangId == plaintext"
         }
       ]
     },
