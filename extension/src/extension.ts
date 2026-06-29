@@ -13,6 +13,7 @@ import { SIDEBAR_VIEW_ID } from "./config/constants";
 import { getApiUrl } from "./config/settings";
 import { SidebarViewProvider } from "./providers/SidebarViewProvider";
 import { BackendService } from "./services/BackendService";
+import { PipelineService } from "./services/PipelineService";
 import { Logger } from "./utils/logger";
 import { StatusBar } from "./utils/statusBar";
 
@@ -31,7 +32,13 @@ export function activate(context: vscode.ExtensionContext): void {
 
   // The persistent sidebar (Activity Bar). retainContextWhenHidden keeps its
   // state when the user switches away and back.
-  const sidebar = new SidebarViewProvider(context.extensionUri, logger);
+  const pipeline = new PipelineService(backend);
+  const sidebar = new SidebarViewProvider(
+    context.extensionUri,
+    logger,
+    pipeline,
+    statusBar
+  );
   context.subscriptions.push(
     vscode.window.registerWebviewViewProvider(SIDEBAR_VIEW_ID, sidebar, {
       webviewOptions: { retainContextWhenHidden: true },
