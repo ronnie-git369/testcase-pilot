@@ -14,3 +14,10 @@ node_modules/
 
 # Environment
 .env
+
+# ChromaDB persistent store (RAG index)
+.chroma/
+backend/.chroma/
+
+# pytest
+.pytest_cache/

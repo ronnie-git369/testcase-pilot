@@ -11,3 +11,8 @@ pythonpath = ["."]
 
 # Sensible defaults: verbose output, show local vars on failure.
 addopts = "-v"
+
+# We write tests as functions only. Disable class-based collection so domain
+# classes like TestCaseDocument / TestCaseRetriever aren't mistaken for test
+# classes (pytest's default `python_classes = Test*` would otherwise warn).
+python_classes = []

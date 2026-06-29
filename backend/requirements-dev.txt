@@ -7,7 +7,6 @@
 -r requirements.txt
 
 iniconfig==2.1.0
-packaging==26.2
 pluggy==1.6.0
 pytest==8.4.2
 tomli==2.4.1

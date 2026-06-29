@@ -1,0 +1,27 @@
+[
+  {
+    "id": "login-001",
+    "text": "Verify a registered user can log in with a valid email and correct password.",
+    "metadata": { "feature": "Login", "type": "positive" }
+  },
+  {
+    "id": "login-002",
+    "text": "Verify login is rejected with a valid email and an incorrect password.",
+    "metadata": { "feature": "Login", "type": "negative" }
+  },
+  {
+    "id": "login-003",
+    "text": "Verify the account is locked after 5 consecutive failed login attempts.",
+    "metadata": { "feature": "Login", "type": "security" }
+  },
+  {
+    "id": "reset-001",
+    "text": "Verify a user can request a password reset link via their registered email.",
+    "metadata": { "feature": "Password Reset", "type": "positive" }
+  },
+  {
+    "id": "report-001",
+    "text": "Verify an admin can export the monthly sales report as a CSV file.",
+    "metadata": { "feature": "Reporting", "type": "positive" }
+  }
+]

@@ -37,7 +37,7 @@ spine, and Milestone 4 puts an HTTP face on it — both still fully deterministi
 
 ---
 
-## Project progress — ~42% complete
+## Project progress — ~54% complete
 
 > An **effort-weighted** estimate (not a feature count). Checked items are built and
 > tested; the remaining items are individually heavier — RAG, test generation, and the
@@ -51,15 +51,15 @@ spine, and Milestone 4 puts an HTTP face on it — both still fully deterministi
 | 4 | Pluggable LLM provider port + Ollama adapter (ADR-0002) | ✅ done | 8% |
 | 5 | `BusinessRuleExtractor` agent + `/business-rules` endpoint | ✅ done | 6% |
 | 6 | `RiskAnalyzer` agent + `/risks` endpoint | ✅ done | 6% |
-| 7 | RAG over existing tests (ChromaDB — ADR-0003) | ⬜ next | 12% |
-| 8 | Coverage-gap detection | ⬜ | 8% |
+| 7 | RAG retrieval over existing tests (ChromaDB — ADR-0003) | ✅ done | 12% |
+| 8 | Coverage-gap detection | ⬜ next | 8% |
 | 9 | `TestGeneratorAgent` (manual + Playwright cases) | ⬜ | 12% |
 | 10 | Self-review / critique step | ⬜ | 6% |
 | 11 | Orchestrator pipeline + `POST /generate` (ADR-0004) | ⬜ | 8% |
 | 12 | VS Code extension (thin TypeScript client — ADR-0005) | ⬜ | 10% |
 | 13 | Examples, golden cases, prompts, polish | ◐ started | 2% |
 
-**Done so far: items 1–6 ≈ 42%.**
+**Done so far: items 1–7 ≈ 54%.**
 
 Two caveats:
 - *Effort-weighted, not feature-count.* By count it's 3 of ~13 (~23%), but the remaining
@@ -476,14 +476,66 @@ uvicorn app.main:app --reload             # terminal 2 → POST to /requirements
 
 ---
 
+## Milestone 5 — Risk Analysis & RAG Retrieval
+
+### Risk analysis (item #6) — `RiskAnalyzer`
+
+The second LLM agent, built as a deliberate near-clone of `BusinessRuleExtractor`:
+same `LLMProvider` port and the same prompt → extract-JSON → Pydantic-validate →
+retry-once pattern.
+
+- `RiskAnalyzer.analyze(req) -> list[str]` — pure (returns risks, does not mutate the
+  Requirement). Its prompt includes `business_rules` when present, so risks sharpen if
+  run after rule extraction.
+- Endpoint `POST /requirements/risks` (parse → analyze), provider injected via `Depends`.
+- **Rule of Three:** the duplication with `BusinessRuleExtractor` is intentional — a
+  *third* JSON-agent will justify extracting a shared base, not the second.
+
+### RAG retrieval (item #7) — the "R" in RAG
+
+**Goal:** give the system *memory of existing tests* so later steps can reason about
+what's already covered. Built deterministic and offline-testable.
+
+**Concepts:** an **embedding** turns text into a vector where similar meaning → nearby
+vectors; a **vector store** (ChromaDB) answers "give me the k nearest." Two phases:
+**ingest** existing tests once, **retrieve** the top-k per request.
+
+**Architecture (port & adapter):**
+
+| File | Role |
+| --- | --- |
+| `app/retrieval/base.py` | `TestCaseRetriever` Protocol (port) + `TestCaseDocument` / `RetrievedTestCase` models |
+| `app/retrieval/chroma.py` | `ChromaRetriever` — embedded ChromaDB, default local ONNX embedding, persists to `CHROMA_PATH` |
+| `app/retrieval/fake.py` | `FakeRetriever` — in-memory Jaccard scoring for offline tests |
+| `app/retrieval/factory.py` | `get_retriever()` — selects backend from `RETRIEVER` (cached) |
+
+**Endpoints (separate `/retrieval` router):** `POST /retrieval/index`,
+`POST /retrieval/search`. The retriever is injected; tests override it with a shared
+`FakeRetriever` so index→search round-trips with no ChromaDB.
+
+**The payoff:** the integration test queries *"sign in using account credentials"* and
+retrieves the *"user logs in with a valid email and password"* test — **no shared
+keywords**, matched on meaning. That's semantic search, the whole point of embeddings.
+
+**Dependency note:** `chromadb` pulled ~60 transitive packages, so `requirements.txt`
+was regenerated as a full pinned lockfile (the pytest stack stays in
+`requirements-dev.txt`). `pip-tools` is the scalable path once a tree gets this big.
+The `.chroma/` store is generated data and is git-ignored.
+
+**Tests:** `FakeRetriever` unit tests + `/retrieval` endpoint tests (offline) + a
+skip-guarded `ChromaRetriever` integration test. Suite: **54 passed, 1 skipped**.
+
+---
+
 ## What's next
 
-- **`RiskAnalyzer`** — the next LLM agent; reuses the exact `LLMProvider` port and the
-  prompt → validate → retry pattern, filling `Requirement.risks`.
-- Then: RAG over existing tests (ChromaDB, ADR-0003), coverage-gap detection, the
-  `TestGeneratorAgent`, and the full orchestrator (`POST /generate`, ADR-0004).
-- A **Claude adapter** (`claude-api` skill) and an **OpenAI adapter** — each just a new
-  `complete()` implementation behind the same port.
+- **Coverage-gap detection (item #8):** compare a requirement's intent (rules, criteria)
+  against the *retrieved* existing tests to find what is **not** yet covered — the core
+  of TestCasePilot's "depth over volume" value.
+- Then: the `TestGeneratorAgent` (#9), a self-review step (#10), the orchestrator
+  (`POST /generate`, ADR-0004, #11), and the VS Code extension (#12).
+- Additional provider adapters — a **Claude** adapter (`claude-api` skill) and **OpenAI**
+  — each just a new `complete()` behind the same port.
 
 Open question still parked: should `feature` get a `min_length=1` constraint on the
 model, or should that validation live in a separate layer? (See §3.4.)

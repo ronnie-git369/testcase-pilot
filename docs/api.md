@@ -11,8 +11,9 @@
 
 The backend is a **FastAPI** application that exposes TestCasePilot's logic over HTTP.
 It serves a deterministic parse endpoint (Markdown → structured `Requirement`), two
-LLM-backed analysis endpoints (business rules, risks), and basic service/health routes.
-The deterministic and probabilistic parts are cleanly separated (see §3).
+LLM-backed analysis endpoints (business rules, risks), retrieval endpoints for semantic
+search over existing tests (RAG), and basic service/health routes. The deterministic and
+probabilistic parts are cleanly separated (see §3).
 
 | Aspect | Detail |
 | --- | --- |
@@ -80,6 +81,20 @@ ollama pull llama3.1 && ollama serve
 ```
 Without a reachable provider, the deterministic routes still work; the analysis
 endpoints return a `502`/`500`-class error when the model can't be reached.
+
+### Retrieval (RAG) configuration
+
+The `/retrieval/*` endpoints use a vector store selected by environment variables:
+
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `RETRIEVER` | `chroma` | Retrieval backend (only `chroma` is implemented today) |
+| `CHROMA_PATH` | `.chroma` | On-disk location of the persistent index |
+| `CHROMA_COLLECTION` | `testcases` | Collection name |
+
+ChromaDB is embedded (no separate server) and uses a small **local** embedding model,
+downloaded once on first use — no API key. The `.chroma/` directory is generated data
+and is git-ignored.
 
 ---
 
@@ -319,6 +334,51 @@ curl -X POST http://127.0.0.1:8000/requirements/risks \
 }
 ```
 
+### `POST /retrieval/index`
+Index (or upsert) existing test cases into the vector store for later search.
+Requires a working retrieval backend (Chroma; see §2).
+
+**Request body:**
+```jsonc
+{ "documents": [ { "id": "t1", "text": "...", "metadata": { "feature": "Login" } } ] }
+```
+`metadata` is optional. Response: `{ "indexed": <count> }`.
+
+```bash
+curl -X POST http://127.0.0.1:8000/retrieval/index \
+  -H "Content-Type: application/json" \
+  -d @examples/existing_tests.json:wrap   # wrap as {"documents": [...]} (see note)
+```
+> The sample file `examples/existing_tests.json` is a raw array; wrap it as
+> `{"documents": [...]}` before posting.
+
+### `POST /retrieval/search`
+Return the indexed test cases most similar to a query (semantic search).
+
+**Request body:**
+
+| Field | Type | Required | Description |
+| --- | --- | --- | --- |
+| `query` | string | yes | Text to find similar test cases for |
+| `k` | integer (1–50) | no (default 5) | Max results |
+
+```bash
+curl -X POST http://127.0.0.1:8000/retrieval/search \
+  -H "Content-Type: application/json" \
+  -d '{"query":"sign in using account credentials","k":3}'
+```
+```json
+[
+  {
+    "id": "login-001",
+    "text": "Verify a registered user can log in with a valid email and correct password.",
+    "score": 0.62,
+    "metadata": { "feature": "Login", "type": "positive" }
+  }
+]
+```
+Results are ordered best-first; `score` is normalized to 0..1 (higher = more similar).
+
 ---
 
 ## 6. Schemas
@@ -379,9 +439,9 @@ isn't running. (API tests prove the *wiring*; the agents' unit tests prove the *
 backend/app/
 ├── main.py              # FastAPI app + router wiring (composition root)
 ├── api/
-│   ├── __init__.py      # exports the router
-│   └── routes.py        # APIRouter + routes: /parse, /business-rules, /risks
-│                        #   + DI providers (get_parser, get_*_extractor/analyzer)
+│   ├── __init__.py      # exports the routers
+│   ├── routes.py        # /parse, /business-rules, /risks + their DI providers
+│   └── retrieval_routes.py  # /retrieval/index, /retrieval/search
 ├── services/
 │   └── requirement_parser.py   # RequirementParserService.parse()  (deterministic)
 ├── agents/                      # LLM-backed agents
@@ -391,9 +451,15 @@ backend/app/
 │   ├── base.py          # LLMProvider Protocol (the port)
 │   ├── ollama_provider.py   # OllamaProvider adapter (httpx -> Ollama)
 │   └── factory.py       # get_llm_provider() — selects backend from env
+├── retrieval/                   # RAG retrieval layer (ADR-0003)
+│   ├── base.py          # TestCaseRetriever port + document/result models
+│   ├── chroma.py        # ChromaRetriever adapter (embedded ChromaDB)
+│   ├── fake.py          # FakeRetriever (in-memory, tests)
+│   └── factory.py       # get_retriever() — selects backend from env
 └── models/
     └── requirement.py   # Requirement (response model / domain entity)
-backend/tests/           # *_parser, *_api, *_extractor, *_analyzer, *_provider tests
+backend/tests/           # parser, api, agent, provider, retrieval tests
+examples/existing_tests.json   # sample corpus to ingest via /retrieval/index
 ```
 
 ---
@@ -403,10 +469,10 @@ backend/tests/           # *_parser, *_api, *_extractor, *_analyzer, *_provider 
 The same patterns (router, request/response models, dependency injection, the
 `LLMProvider` port) will host the rest of the agentic pipeline:
 
-- RAG over existing tests (ChromaDB — [ADR-0003](./adr/0003-rag-with-chromadb.md)),
-  coverage-gap detection, and the `TestGeneratorAgent`.
-- `POST /generate` — the orchestrator endpoint chaining all stages (analyze → extract
-  rules → risk → retrieve → coverage gaps → generate → self-review). See
-  [ADR-0004](./adr/0004-agent-orchestration-pipeline.md).
+- **Coverage-gap detection** — compare a requirement against the *retrieved* existing
+  tests (`/retrieval/search`) to find what's not yet covered.
+- The `TestGeneratorAgent`, then `POST /generate` — the orchestrator endpoint chaining
+  all stages (analyze → extract rules → risk → retrieve → coverage gaps → generate →
+  self-review). See [ADR-0004](./adr/0004-agent-orchestration-pipeline.md).
 - Additional provider adapters (Claude, OpenAI) — each a new `complete()` behind the
   same port. See [ADR-0002](./adr/0002-pluggable-llm-provider.md).

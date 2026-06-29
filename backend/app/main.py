@@ -2,6 +2,7 @@
 
 from fastapi import FastAPI
 
+from app.api import retrieval_router
 from app.api import router as api_router
 
 app = FastAPI(
@@ -14,6 +15,7 @@ app = FastAPI(
 # Mount feature routes (e.g. /requirements/parse). main.py stays the thin
 # composition root: it wires routers together but contains no route logic.
 app.include_router(api_router)
+app.include_router(retrieval_router)
 
 
 @app.get("/")
