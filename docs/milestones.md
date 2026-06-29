@@ -37,7 +37,7 @@ spine, and Milestone 4 puts an HTTP face on it — both still fully deterministi
 
 ---
 
-## Project progress — ~74% complete
+## Project progress — ~80% complete
 
 > An **effort-weighted** estimate (not a feature count). Checked items are built and
 > tested; the remaining items are individually heavier — RAG, test generation, and the
@@ -54,12 +54,12 @@ spine, and Milestone 4 puts an HTTP face on it — both still fully deterministi
 | 7 | RAG retrieval over existing tests (ChromaDB — ADR-0003) | ✅ done | 12% |
 | 8 | Coverage-gap detection (`CoverageAnalyzer` + `/coverage`) | ✅ done | 8% |
 | 9 | `TestGeneratorAgent` (manual cases) | ✅ done | 12% |
-| 10 | Self-review / critique step | ⬜ next | 6% |
-| 11 | Orchestrator pipeline + `POST /generate` (ADR-0004) | ⬜ | 8% |
+| 10 | Self-review / critique step (`SelfReviewer`) | ✅ done | 6% |
+| 11 | Orchestrator pipeline + `POST /generate` (ADR-0004) | ⬜ next | 8% |
 | 12 | VS Code extension (thin TypeScript client — ADR-0005) | ⬜ | 10% |
 | 13 | Examples, golden cases, prompts, polish | ◐ started | 2% |
 
-**Done so far: items 1–9 ≈ 74%.**
+**Done so far: items 1–10 ≈ 80%.**
 
 Two caveats:
 - *Effort-weighted, not feature-count.* By count it's 3 of ~13 (~23%), but the remaining
@@ -593,13 +593,28 @@ Tests: 5 offline unit tests (FakeProvider). Suite: **67 passed, 1 skipped**.
 
 ---
 
+## Milestone 8 — Self-Review (item #10)
+
+The "reviews its own output before presenting" step from the vision.
+
+- `app/agents/self_reviewer.py`: `SelfReviewer.review(requirement, cases) ->
+  list[TestCase]`. The *fifth* agent on `complete_json` (schema reused: `TestSuite`).
+- It serializes the **draft cases into the prompt** and asks the model to critique them
+  (duplicate/overlapping cases, missing negative/edge cases, vague steps, weak
+  assertions), then return an **improved** set.
+- Pure; drops incomplete cases; **skips the LLM entirely when given no cases** (don't
+  waste a call). Same `(req, cases) -> list[TestCase]` contract as the generator, so the
+  orchestrator can chain `generate → review` directly.
+
+Tests: 5 offline unit tests. Suite: **72 passed, 1 skipped**.
+
+---
+
 ## What's next
 
-- **Self-review / critique (item #10):** a pass that critiques the generated cases
-  (duplicates, missing edge cases, weak assertions) and revises — the "review its own
-  output" step from the vision.
 - **Orchestrator (`POST /generate`, ADR-0004, #11):** chain everything —
-  parse → rules → risk → retrieve → coverage → generate → self-review — into one call.
+  parse → rules → risk → retrieve → coverage → generate → self-review — into one HTTP
+  call, surfacing the whole pipeline (and the test cases) for the first time.
 - **VS Code extension (#12)** and additional provider adapters (**Claude** via the
   `claude-api` skill, **OpenAI**) behind the same port.
 

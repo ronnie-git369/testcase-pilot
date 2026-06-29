@@ -472,7 +472,8 @@ backend/app/
 │   ├── business_rule_extractor.py   # BusinessRuleExtractor.extract()
 │   ├── risk_analyzer.py             # RiskAnalyzer.analyze()
 │   ├── coverage_analyzer.py         # CoverageAnalyzer.analyze() (LLM + retriever)
-│   └── test_generator.py            # TestGeneratorAgent.generate() (not yet wired to HTTP)
+│   ├── test_generator.py            # TestGeneratorAgent.generate() (not yet wired to HTTP)
+│   └── self_reviewer.py             # SelfReviewer.review() (not yet wired to HTTP)
 ├── providers/                   # LLM provider port + adapters (ADR-0002)
 │   ├── base.py          # LLMProvider Protocol (the port)
 │   ├── ollama_provider.py   # OllamaProvider adapter (httpx -> Ollama)
@@ -497,9 +498,8 @@ examples/existing_tests.json   # sample corpus to ingest via /retrieval/index
 The same patterns (router, request/response models, dependency injection, the
 `LLMProvider` port) will host the rest of the agentic pipeline:
 
-- A **self-review** pass that critiques and revises the generated cases.
 - `POST /generate` — the orchestrator endpoint chaining all stages (parse → rules → risk
-  → retrieve → coverage gaps → generate → self-review), surfacing `TestGeneratorAgent`
-  over HTTP. See [ADR-0004](./adr/0004-agent-orchestration-pipeline.md).
+  → retrieve → coverage gaps → generate → self-review), surfacing the `TestGeneratorAgent`
+  and `SelfReviewer` over HTTP. See [ADR-0004](./adr/0004-agent-orchestration-pipeline.md).
 - Additional provider adapters (Claude, OpenAI) — each a new `complete()` behind the
   same port. See [ADR-0002](./adr/0002-pluggable-llm-provider.md).
