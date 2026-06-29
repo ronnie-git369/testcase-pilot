@@ -4,13 +4,19 @@
 // add-a-line Acceptance criteria list). On submit it composes Markdown, posts it
 // to the backend via the shared api client, opens the rendered report beside the
 // form, and echoes a result summary back into the panel. All vscode-specific
-// wiring lives here; the form->Markdown logic stays pure in compose.ts.
+// wiring lives here; the form->Markdown logic stays pure in services/compose.ts.
+//
+// NOTE (migration): in Milestone 6 this transient WebviewPanel is replaced by a
+// persistent sidebar WebviewView (providers/SidebarViewProvider.ts). It is kept
+// working here so the scaffold migration changes structure, not behavior.
 
 import * as vscode from "vscode";
 
-import { generateTestCases, type GenerationResult } from "./api";
-import { buildRequirementMarkdown, type RequirementInput } from "./compose";
-import { renderReport } from "./render";
+import { generateTestCases } from "../api/generateClient";
+import type { GenerationResult } from "../models/requirement";
+import { buildRequirementMarkdown, type RequirementInput } from "../services/compose";
+import { renderReport } from "../services/render";
+import { makeNonce } from "../utils/nonce";
 
 export class RequirementPanel {
   public static readonly viewType = "testcasePilot.form";
@@ -262,13 +268,4 @@ export class RequirementPanel {
 </body>
 </html>`;
   }
-}
-
-function makeNonce(): string {
-  const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
-  let text = "";
-  for (let i = 0; i < 32; i++) {
-    text += chars.charAt(Math.floor(Math.random() * chars.length));
-  }
-  return text;
 }

@@ -1,11 +1,11 @@
 // Unit tests for the pure Markdown renderer, using Node's built-in test runner.
-// Run after compiling: `npm test` (node --test out/).
+// Run after compiling: `npm test` (tsc -> out/, then node --test out/test/).
 
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { renderReport } from "./render";
-import type { GenerationResult } from "./api";
+import { renderReport } from "../services/render";
+import type { GenerationResult } from "../models/requirement";
 
 function sampleResult(): GenerationResult {
   return {

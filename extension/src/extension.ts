@@ -2,9 +2,9 @@
 
 import * as vscode from "vscode";
 
-import { generateTestCases } from "./api";
-import { RequirementPanel } from "./panel";
-import { renderReport } from "./render";
+import { generateTestCases } from "./api/generateClient";
+import { RequirementPanel } from "./views/RequirementPanel";
+import { renderReport } from "./services/render";
 
 export function activate(context: vscode.ExtensionContext): void {
   context.subscriptions.push(

@@ -1,8 +1,13 @@
-.gitignore
+# What to EXCLUDE from the packaged .vsix. We ship only the built bundle
+# (dist/) and the webview assets (media/) — never the TypeScript source, the
+# tsc test output, or the build tooling.
 .vscode/**
 src/**
-out/**/*.test.js
-out/**/*.test.js.map
-**/*.ts
-tsconfig.json
+out/**
 node_modules/**
+esbuild.js
+tsconfig.json
+**/*.ts
+**/*.map
+.gitignore
+.vscodeignore

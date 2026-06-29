@@ -1,10 +1,10 @@
 // Unit tests for the pure Markdown composer, using Node's built-in test runner.
-// Run after compiling: `npm test` (node --test out/).
+// Run after compiling: `npm test` (tsc -> out/, then node --test out/test/).
 
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { buildRequirementMarkdown } from "./compose";
+import { buildRequirementMarkdown } from "../services/compose";
 
 test("emits the feature as an H1 heading", () => {
   const md = buildRequirementMarkdown({

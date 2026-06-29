@@ -1,7 +1,7 @@
 // Pure formatter: GenerationResult -> a review-ready Markdown report.
 // Kept free of the vscode API so it can be unit-tested in plain Node.
 
-import type { GenerationResult } from "./api";
+import type { GenerationResult } from "../models/requirement";
 
 function bullets(items: string[]): string {
   return items.length ? items.map((i) => `- ${i}`).join("\n") : "_(none)_";
