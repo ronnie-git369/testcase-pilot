@@ -1,26 +1,163 @@
 # TestCasePilot
 
+> An Agentic AI QA assistant that generates enterprise-quality test cases from software requirements.
+
+TestCasePilot helps QA engineers turn raw requirements into comprehensive, review-ready
+test cases. Instead of producing a flat list of generated tests, it works like a senior
+QA engineer — reasoning about the requirement, mining existing coverage, and critiquing
+its own output before presenting results.
+
 ## Vision
 
-TestCasePilot is an Agentic AI QA Assistant that helps QA engineers generate comprehensive test cases from software requirements.
+Given a software requirement, TestCasePilot:
 
-Instead of simply generating test cases, it behaves like a senior QA engineer by:
+1. **Analyzes** the requirement to understand intent and scope
+2. **Extracts business rules** that the system must enforce
+3. **Performs risk analysis** to prioritize what matters most
+4. **Finds existing test cases** using retrieval-augmented generation (RAG)
+5. **Detects missing coverage** by comparing intent against what already exists
+6. **Generates** enterprise-quality test cases
+7. **Reviews its own output** before presenting the final result
 
-- Analyzing requirements
-- Extracting business rules
-- Performing risk analysis
-- Finding existing test cases using RAG
-- Detecting missing coverage
-- Generating enterprise-quality test cases
-- Reviewing its own output before presenting results
+The goal is depth over volume: fewer, higher-signal test cases that a QA lead would
+actually sign off on.
 
 ## Tech Stack
 
-- FastAPI
-- Python
-- VS Code Extension
-- TypeScript
-- RAG
-- Agentic AI
-- ChromaDB
-- OpenAI / Claude / Ollama
+| Layer        | Technology                          |
+| ------------ | ----------------------------------- |
+| Backend API  | FastAPI · Python · Uvicorn          |
+| Data models  | Pydantic v2                         |
+| Retrieval    | RAG · ChromaDB                      |
+| Agent / LLM  | OpenAI · Claude · Ollama            |
+| Client       | VS Code Extension · TypeScript      |
+
+## Architecture
+
+```
+                 User
+                  │
+                  ▼
+         VS Code Extension
+                  │
+                  ▼
+          FastAPI Backend
+                  │
+          Agent Orchestrator
+                  │
+      ┌───────────┼───────────┐
+      ▼           ▼           ▼
+ Requirement   RAG Tool   Coverage Tool
+      │           │           │
+      └───────────┼───────────┘
+                  ▼
+            AI Provider
+      (OpenAI / Claude / Ollama)
+                  │
+                  ▼
+      Enterprise Test Cases
+```
+
+The **VS Code extension** sends a requirement to the **FastAPI backend**, which hands it
+to the **Agent Orchestrator**. The orchestrator coordinates specialized tools — a
+**Requirement** analyzer, a **RAG tool** for finding existing test cases, and a
+**Coverage tool** for detecting gaps — and calls a configurable **AI provider** to
+produce the final **enterprise test cases**.
+
+## Project Structure
+
+```
+testcase-pilot/
+├── backend/            # FastAPI service (agent orchestration + RAG API)
+│   ├── app/            # Application package (imported as app.main:app)
+│   │   ├── main.py     # FastAPI entrypoint — root banner + /health
+│   │   ├── api/        # API routes (routes.py — placeholder)
+│   │   ├── agents/     # Agent orchestration (requirement_agent.py — placeholder)
+│   │   ├── models/     # Pydantic models (requirement.py — placeholder)
+│   │   └── services/   # Services, e.g. requirement parsing (placeholder)
+│   └── requirements.txt
+├── extension/          # VS Code extension (TypeScript client)
+├── prompts/            # Agent prompt templates
+├── examples/           # Sample requirements and generated test cases
+├── docs/               # Design notes and documentation (e.g. git-commit-guide.md)
+├── tests/              # Test suite
+├── LICENSE
+└── README.md
+```
+
+> **Status:** Early scaffold. The backend dependencies and project layout are in place
+> and the FastAPI entrypoint (`app/main.py`) serves a root banner and `/health` check.
+> The `api/`, `agents/`, `models/`, and `services/` packages are empty placeholders, and
+> the agent, RAG, and extension implementations are still to come. Directories not yet
+> listed above (`extension/`, `prompts/`, `examples/`, `tests/`) are intended structure
+> and may currently be empty.
+
+## Getting Started
+
+### Prerequisites
+
+- Python 3.9+
+- (Optional) An LLM provider: an OpenAI or Anthropic API key, or a local [Ollama](https://ollama.com) install
+
+### Backend setup
+
+```bash
+cd backend
+
+# Create and activate a virtual environment
+python3 -m venv .venv
+source .venv/bin/activate        # Windows: .venv\Scripts\activate
+
+# Install dependencies
+pip install -r requirements.txt
+```
+
+### Running the API
+
+The application entrypoint lives at `app/main.py` (exposing a FastAPI `app`). From
+inside `backend/`:
+
+```bash
+uvicorn app.main:app --reload
+```
+
+The service will be available at http://127.0.0.1:8000, with interactive docs at
+http://127.0.0.1:8000/docs. A `GET /` returns a service banner and `GET /health`
+returns a health check.
+
+### Configuration
+
+LLM provider credentials are read from environment variables (kept out of version
+control via `.gitignore`). Create a `.env` file in `backend/`:
+
+```bash
+# Choose a provider
+OPENAI_API_KEY=...
+ANTHROPIC_API_KEY=...
+# or point at a local Ollama instance
+OLLAMA_HOST=http://localhost:11434
+```
+
+## Backend Dependencies
+
+Pinned in [`backend/requirements.txt`](backend/requirements.txt):
+
+- **fastapi** — web framework for the API
+- **uvicorn** — ASGI server
+- **pydantic** / **pydantic-core** — request/response models and validation
+- **starlette**, **anyio**, **h11** — ASGI/async plumbing (FastAPI dependencies)
+
+## Roadmap
+
+- [x] Backend application entrypoint (`app/main.py` with root banner + `/health`)
+- [ ] API routes (`app/api/routes.py`)
+- [ ] Agent orchestration pipeline (analyze → extract → risk → retrieve → gap → generate → review)
+- [ ] ChromaDB-backed RAG over existing test cases
+- [ ] Pluggable LLM providers (OpenAI / Claude / Ollama)
+- [ ] VS Code extension client
+- [ ] Example requirements and golden test cases
+- [ ] Test suite
+
+## License
+
+See [LICENSE](LICENSE).
